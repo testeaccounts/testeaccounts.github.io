@@ -1,0 +1,29 @@
+---
+import { testimonials } from '../data/testimonials';
+import Icon from './Icon.astro';
+import SectionTitle from './SectionTitle.astro';
+---
+
+<section class="section testimonials">
+	<div class="container">
+		<SectionTitle
+			eyebrow="Depoimentos"
+			title="O que os clientes falam"
+			description="Comentarios ficticios para mostrar como ficou facil usar o site."
+			align="center"
+		/>
+
+		<div class="testimonial-grid">
+			{testimonials.map((item) => (
+				<article class="testimonial-card">
+					<span class="testimonial-card__icon"><Icon name="quote" /></span>
+					<p>{item.quote}</p>
+					<footer>
+						<strong>{item.name}</strong>
+						<span>{item.role}</span>
+					</footer>
+				</article>
+			))}
+		</div>
+	</div>
+</section>

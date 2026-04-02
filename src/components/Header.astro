@@ -1,0 +1,577 @@
+---
+import { buildWhatsAppLink, company, headerShortcuts, navItems } from '../data/site';
+import { productTabs } from '../data/products';
+import { offers } from '../data/offers';
+import Icon from './Icon.astro';
+
+interface Props {
+	homePath?: string;
+}
+
+const { homePath = '' } = Astro.props;
+const whatsappHref = buildWhatsAppLink(`Ola! Quero pedir no ${company.name}.`);
+const resolveNavHref = (href: string) => (href.startsWith('#') ? `${homePath}${href}` : href);
+const normalizeTag = (value: string) =>
+	value
+		.toLowerCase()
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.replace(/[^\w\s-]/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim();
+
+const basePath = import.meta.env.BASE_URL;
+const productsPath = `${homePath || basePath}produtos/`;
+const searchableProductNames = Array.from(
+	new Set([
+		...productTabs.flatMap((tab) => tab.products.map((product) => product.name)),
+		...offers.map((offer) => offer.name),
+	])
+).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+const searchableTags = Array.from(
+	new Set(
+		[
+			...productTabs.flatMap((tab) =>
+				tab.products.flatMap((product) => [
+					product.sector,
+					product.productType,
+					product.brand,
+					product.badge,
+					tab.label,
+					...(product.tags ?? []),
+				]),
+			),
+			...offers.flatMap((offer) => [offer.label, offer.name]),
+		]
+			.map(normalizeTag)
+			.filter((tag) => tag.length > 1),
+	),
+).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+---
+
+<header class="header" data-header data-home-path={homePath} data-products-path={productsPath}>
+	<div class="container header__main">
+		<a class="brand" href={resolveNavHref('#inicio')} aria-label={`Voltar ao inicio de ${company.name}`}>
+			<span class="brand__mark">{company.logo}</span>
+			<span class="brand__copy">
+				<strong>{company.name}</strong>
+				<small>{company.slogan}</small>
+			</span>
+		</a>
+
+		<form class="header__search" role="search" id="busca" data-search-form autocomplete="off">
+			<Icon name="search" />
+			<div class="header__search-field">
+				<input
+					type="search"
+					placeholder="O que voce esta procurando? Use # para tags"
+					aria-label="Buscar produtos e categorias"
+					aria-autocomplete="list"
+					aria-expanded="false"
+					aria-controls="header-search-suggestions"
+					autocomplete="off"
+					spellcheck="false"
+					data-search-input
+				/>
+				<ul class="header__search-suggestions" id="header-search-suggestions" data-search-suggestions role="listbox" hidden></ul>
+			</div>
+			<button type="submit">Buscar</button>
+		</form>
+		<script type="application/json" data-search-products set:html={JSON.stringify(searchableProductNames)}></script>
+		<script type="application/json" data-search-tags set:html={JSON.stringify(searchableTags)}></script>
+
+		<div class="header__actions">
+			<a class="header__login" href={resolveNavHref('#contato')}>
+				<Icon name="user" />
+				<span>Entrar</span>
+			</a>
+			<button class="header__icon-button header__theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Ativar tema escuro">
+				<Icon name="moon" className="theme-icon theme-icon--moon" />
+				<Icon name="sun" className="theme-icon theme-icon--sun" />
+			</button>
+			<button class="header__icon-button" type="button" aria-label="Favoritos">
+				<Icon name="heart" />
+			</button>
+			<button class="header__icon-button header__icon-button--list" type="button" data-list-toggle aria-label="Abrir lista de compras">
+				<Icon name="basket" />
+				<strong data-list-count>0</strong>
+			</button>
+			<a class="button button--primary header__whatsapp" href={whatsappHref} target="_blank" rel="noreferrer">
+				<Icon name="whatsapp" />
+				<span>WhatsApp</span>
+			</a>
+			<button class="header__menu-toggle" type="button" data-menu-button aria-expanded="false" aria-controls="menu-principal">
+				<Icon name="menu" />
+				<span class="sr-only">Abrir menu</span>
+			</button>
+		</div>
+	</div>
+
+	<div class="header__nav-wrap">
+		<div class="container">
+			<nav class="header__nav" id="menu-principal" data-menu-panel aria-label="Navegacao principal">
+				<div class="header__nav-main">
+					<a class="header__all" href={resolveNavHref('#categorias')} data-nav-link>
+						<Icon name="menu" />
+						<span>Ver setores da loja</span>
+					</a>
+					<ul class="header__nav-list">
+						{navItems.map((item) => (
+							<li><a href={resolveNavHref(item.href)} data-nav-link>{item.label}</a></li>
+						))}
+					</ul>
+				</div>
+				<div class="header__shortcut-list">
+					{headerShortcuts.map((item) => (
+						<a href={resolveNavHref(item.href)} data-nav-link>
+							<Icon name={item.icon} />
+							<span>{item.label}</span>
+						</a>
+					))}
+				</div>
+			</nav>
+		</div>
+	</div>
+
+	<script is:inline>
+		const header = document.querySelector('[data-header]');
+
+		if (header instanceof HTMLElement) {
+			const button = header.querySelector('[data-menu-button]');
+			const panel = document.querySelector('[data-menu-panel]');
+			const navLinks = header.querySelectorAll('[data-nav-link]');
+			const searchForm = header.querySelector('[data-search-form]');
+			const searchInput = header.querySelector('[data-search-input]');
+			const searchSuggestions = header.querySelector('[data-search-suggestions]');
+			const searchProductsJson = header.querySelector('[data-search-products]');
+			const searchTagsJson = header.querySelector('[data-search-tags]');
+			const homePath = header.getAttribute('data-home-path') ?? '';
+			const productsPath = header.getAttribute('data-products-path') ?? `${homePath}produtos/`;
+			const themeButton = header.querySelector('[data-theme-toggle]');
+			const root = document.documentElement;
+			const themeColorMeta = document.querySelector('[data-theme-color]');
+			const MAX_TAGS = 3;
+			let lastScrollY = Math.max(window.scrollY, 0);
+			let stateAnchorY = lastScrollY;
+			let scrollState = 'shown';
+			let scrollTicking = false;
+			let searchItems = [];
+			let searchTags = [];
+
+			try {
+				if (searchProductsJson instanceof HTMLScriptElement) {
+					const parsed = JSON.parse(searchProductsJson.textContent ?? '[]');
+					searchItems = Array.isArray(parsed) ? parsed : [];
+				}
+			} catch {
+				searchItems = [];
+			}
+
+			try {
+				if (searchTagsJson instanceof HTMLScriptElement) {
+					const parsed = JSON.parse(searchTagsJson.textContent ?? '[]');
+					searchTags = Array.isArray(parsed) ? parsed : [];
+				}
+			} catch {
+				searchTags = [];
+			}
+
+			const normalizeSearch = (value) =>
+				value
+					.toLowerCase()
+					.normalize('NFD')
+					.replace(/[\u0300-\u036f]/g, '')
+					.trim();
+
+			const parseTagTokens = (value = '') => {
+				const matches = value.match(/#([^\s#]+)/g) ?? [];
+				const uniqueTags = [];
+
+				matches.forEach((token) => {
+					const normalized = normalizeSearch(token.replace(/^#/, ''))
+						.replace(/[^\w\s-]/g, ' ')
+						.replace(/\s+/g, ' ')
+						.trim();
+					if (!normalized || uniqueTags.includes(normalized)) return;
+					uniqueTags.push(normalized);
+				});
+
+				return uniqueTags;
+			};
+
+			const stripTagTokens = (value = '') =>
+				value
+					.replace(/#[^\s#]+/g, ' ')
+					.replace(/\s+/g, ' ')
+					.trim();
+
+			const getTagPartial = (value = '') => {
+				const hashIndex = value.lastIndexOf('#');
+				if (hashIndex < 0) return '';
+				const partial = value.slice(hashIndex + 1);
+				if (/\s/.test(partial)) return '';
+				return normalizeSearch(partial)
+					.replace(/[^\w\s-]/g, ' ')
+					.replace(/\s+/g, ' ')
+					.trim();
+			};
+
+			const buildInputValueWithTags = (queryText, tags) => {
+				const cleanText = stripTagTokens(queryText);
+				const cleanTags = tags.slice(0, MAX_TAGS).map((tag) => `#${tag}`);
+				return [cleanText, ...cleanTags].filter(Boolean).join(' ').trim();
+			};
+
+			const hideSuggestions = () => {
+				if (searchSuggestions instanceof HTMLElement) {
+					searchSuggestions.hidden = true;
+					searchSuggestions.innerHTML = '';
+				}
+				if (searchInput instanceof HTMLInputElement) {
+					searchInput.setAttribute('aria-expanded', 'false');
+				}
+			};
+
+			const findProductSuggestions = (queryRaw) => {
+				const query = normalizeSearch(queryRaw);
+				if (!query) return [];
+
+				return searchItems
+					.filter((name) => {
+						const normalizedName = normalizeSearch(String(name));
+						if (normalizedName.startsWith(query)) return true;
+						return normalizedName.split(/\s+/).some((word) => word.startsWith(query));
+					})
+					.slice(0, 8);
+			};
+
+			const findTagSuggestions = (queryRaw) => {
+				const selectedTags = parseTagTokens(queryRaw);
+				const partialTag = getTagPartial(queryRaw);
+				if (!queryRaw.includes('#')) return [];
+				if (selectedTags.length >= MAX_TAGS && !partialTag) return [];
+
+				const availableTags = searchTags.filter(
+					(tag) => !selectedTags.includes(tag) || tag === partialTag,
+				);
+
+				if (!partialTag) return availableTags.slice(0, 8);
+
+				return availableTags
+					.filter((tag) => tag.startsWith(partialTag) || tag.includes(partialTag))
+					.slice(0, 8);
+			};
+
+			const renderSuggestions = (queryRaw) => {
+				if (!(searchSuggestions instanceof HTMLElement)) return;
+				const isTagSearch = queryRaw.includes('#');
+				const selectedTags = parseTagTokens(queryRaw);
+				const suggestions = isTagSearch
+					? findTagSuggestions(queryRaw).map((value) => ({ value, type: 'tag' }))
+					: findProductSuggestions(queryRaw).map((value) => ({ value, type: 'product' }));
+
+				searchSuggestions.innerHTML = '';
+				if (!suggestions.length) {
+					if (isTagSearch && selectedTags.length >= MAX_TAGS) {
+						const item = document.createElement('li');
+						const hint = document.createElement('span');
+						hint.className = 'header__search-suggestion header__search-suggestion--hint';
+						hint.textContent = 'Limite de 3 tags atingido.';
+						item.appendChild(hint);
+						searchSuggestions.appendChild(item);
+						searchSuggestions.hidden = false;
+						if (searchInput instanceof HTMLInputElement) {
+							searchInput.setAttribute('aria-expanded', 'true');
+						}
+						return;
+					}
+					hideSuggestions();
+					return;
+				}
+
+				suggestions.forEach((suggestion) => {
+					const item = document.createElement('li');
+					const button = document.createElement('button');
+					button.type = 'button';
+					button.className =
+						`header__search-suggestion${suggestion.type === 'tag' ? ' header__search-suggestion--tag' : ''}`;
+					button.textContent =
+						suggestion.type === 'tag' ? `#${suggestion.value}` : suggestion.value;
+					button.setAttribute('data-suggestion', suggestion.value);
+					button.setAttribute('data-suggestion-type', suggestion.type);
+					button.setAttribute('role', 'option');
+					item.appendChild(button);
+					searchSuggestions.appendChild(item);
+				});
+
+				searchSuggestions.hidden = false;
+				if (searchInput instanceof HTMLInputElement) {
+					searchInput.setAttribute('aria-expanded', 'true');
+				}
+			};
+
+			const applyTagToInput = (tag) => {
+				if (!(searchInput instanceof HTMLInputElement)) return;
+				const partialTag = getTagPartial(searchInput.value);
+				const currentTags = parseTagTokens(searchInput.value).filter(
+					(currentTag) => currentTag !== tag && currentTag !== partialTag,
+				);
+				if (currentTags.length >= MAX_TAGS) {
+					currentTags.length = MAX_TAGS - 1;
+				}
+				const nextTags = [...currentTags, tag].slice(0, MAX_TAGS);
+				searchInput.value = `${buildInputValueWithTags(searchInput.value, nextTags)} `;
+				renderSuggestions(searchInput.value);
+				searchInput.focus();
+			};
+
+			const setTheme = (theme, persist = true) => {
+				const normalizedTheme = theme === 'dark' ? 'dark' : 'light';
+				root.dataset.theme = normalizedTheme;
+				root.style.colorScheme = normalizedTheme;
+				if (themeButton instanceof HTMLElement) {
+					themeButton.setAttribute('aria-pressed', normalizedTheme === 'dark' ? 'true' : 'false');
+					themeButton.setAttribute('aria-label', normalizedTheme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro');
+				}
+				if (themeColorMeta instanceof HTMLMetaElement) {
+					themeColorMeta.setAttribute('content', normalizedTheme === 'dark' ? '#0f1712' : '#3a972f');
+				}
+				if (persist) {
+					try {
+						localStorage.setItem('market-theme', normalizedTheme);
+					} catch {
+						/* sem armazenamento */
+					}
+				}
+			};
+
+			const getSavedTheme = () => {
+				try {
+					return localStorage.getItem('market-theme');
+				} catch {
+					return null;
+				}
+			};
+
+			const initialTheme = root.dataset.theme === 'dark' || root.dataset.theme === 'light' ? root.dataset.theme : getSavedTheme() === 'dark' ? 'dark' : 'light';
+			setTheme(initialTheme, false);
+
+			const setMenuState = (isOpen) => {
+				header.classList.toggle('is-open', isOpen);
+				if (isOpen) {
+					header.classList.remove('is-scroll-hide');
+					scrollState = 'shown';
+					stateAnchorY = Math.max(window.scrollY, 0);
+				}
+				if (button instanceof HTMLElement) button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+				if (window.innerWidth < 1024) {
+					document.body.classList.toggle('menu-open', isOpen);
+				} else {
+					document.body.classList.remove('menu-open');
+				}
+			};
+
+			const closeMenu = () => {
+				setMenuState(false);
+			};
+
+			const goToTarget = (targetId) => {
+				const target = document.getElementById(targetId);
+				if (target instanceof HTMLElement) {
+					target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+					return;
+				}
+
+				if (homePath) {
+					window.location.href = `${homePath}#${targetId}`;
+				}
+			};
+
+			button?.addEventListener('click', () => {
+				setMenuState(!header.classList.contains('is-open'));
+			});
+
+			themeButton?.addEventListener('click', () => {
+				const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+				setTheme(nextTheme);
+			});
+
+			const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+			const handleSystemTheme = (event) => {
+				const savedTheme = getSavedTheme();
+				if (savedTheme === 'dark' || savedTheme === 'light') return;
+				setTheme(event.matches ? 'dark' : 'light', false);
+			};
+
+			if (typeof mediaQuery.addEventListener === 'function') {
+				mediaQuery.addEventListener('change', handleSystemTheme);
+			} else if (typeof mediaQuery.addListener === 'function') {
+				mediaQuery.addListener(handleSystemTheme);
+			}
+
+			const updateHeaderDensity = () => {
+				const currentScrollY = Math.max(window.scrollY, 0);
+				header.classList.toggle('is-condensed', currentScrollY > 20);
+
+				const isMobile = window.innerWidth <= 1023;
+				const menuIsOpen = header.classList.contains('is-open');
+				const drawerIsOpen = document.body.classList.contains('drawer-open');
+				const searchIsFocused =
+					searchInput instanceof HTMLInputElement &&
+					document.activeElement === searchInput;
+				const delta = currentScrollY - lastScrollY;
+				const hideDistance = 78;
+				const showDistance = 112;
+				const minHideY = 116;
+
+				if (!isMobile || menuIsOpen || drawerIsOpen || searchIsFocused) {
+					header.classList.remove('is-scroll-hide');
+					scrollState = 'shown';
+					stateAnchorY = currentScrollY;
+					lastScrollY = currentScrollY;
+					return;
+				}
+
+				if (currentScrollY <= 24) {
+					header.classList.remove('is-scroll-hide');
+					scrollState = 'shown';
+					stateAnchorY = currentScrollY;
+					lastScrollY = currentScrollY;
+					return;
+				}
+
+				if (Math.abs(delta) < 1.5) {
+					lastScrollY = currentScrollY;
+					return;
+				}
+
+				if (scrollState === 'shown') {
+					if (delta < 0) {
+						stateAnchorY = currentScrollY;
+					} else if (currentScrollY > minHideY && currentScrollY - stateAnchorY > hideDistance) {
+						header.classList.add('is-scroll-hide');
+						scrollState = 'hidden';
+						stateAnchorY = currentScrollY;
+						lastScrollY = currentScrollY;
+						return;
+					}
+				} else {
+					if (delta > 0) {
+						stateAnchorY = currentScrollY;
+					} else if (stateAnchorY - currentScrollY > showDistance) {
+						header.classList.remove('is-scroll-hide');
+						scrollState = 'shown';
+						stateAnchorY = currentScrollY;
+						lastScrollY = currentScrollY;
+						return;
+					}
+				}
+
+				lastScrollY = currentScrollY;
+			};
+
+			updateHeaderDensity();
+			window.addEventListener(
+				'scroll',
+				() => {
+					if (scrollTicking) return;
+					scrollTicking = true;
+					window.requestAnimationFrame(() => {
+						updateHeaderDensity();
+						scrollTicking = false;
+					});
+				},
+				{ passive: true },
+			);
+
+			document.addEventListener('keydown', (event) => {
+				if (event.key === 'Escape') closeMenu();
+			});
+
+			document.addEventListener('click', (event) => {
+				const target = event.target;
+				if (!(target instanceof Node)) return;
+				if (!header.contains(target) && panel instanceof HTMLElement) closeMenu();
+				if (searchForm instanceof HTMLElement && !searchForm.contains(target)) hideSuggestions();
+			});
+
+			navLinks.forEach((link) => {
+				link.addEventListener('click', closeMenu);
+			});
+
+			panel?.addEventListener('click', (event) => {
+				const target = event.target;
+				if (!(target instanceof Element)) return;
+				const anchor = target.closest('a[href^="#"]');
+				if (anchor instanceof HTMLAnchorElement) closeMenu();
+			});
+
+			window.addEventListener('resize', () => {
+				if (window.innerWidth > 1024) closeMenu();
+				updateHeaderDensity();
+			});
+
+			searchForm?.addEventListener('submit', (event) => {
+				event.preventDefault();
+				hideSuggestions();
+
+				let query = '';
+				if (searchInput instanceof HTMLInputElement) {
+					query = searchInput.value.trim().toLowerCase();
+				}
+				const selectedTags = parseTagTokens(query);
+				const textQuery = stripTagTokens(query);
+				if (selectedTags.length > 0) {
+					const params = new URLSearchParams();
+					params.set('tags', selectedTags.slice(0, MAX_TAGS).join(','));
+					if (textQuery) {
+						params.set('q', textQuery);
+					}
+					window.location.href = `${productsPath}?${params.toString()}`;
+					return;
+				}
+
+				let targetId = 'destaques';
+				if (textQuery.includes('padaria') || textQuery.includes('pao') || textQuery.includes('bolo')) targetId = 'setor-padaria';
+				if (textQuery.includes('limpeza') || textQuery.includes('detergente') || textQuery.includes('sabao')) targetId = 'setor-limpeza';
+				if (textQuery.includes('fruta') || textQuery.includes('verdura') || textQuery.includes('horti') || textQuery.includes('banana')) targetId = 'setor-hortifruti';
+				if (textQuery.includes('oferta') || textQuery.includes('promo')) targetId = 'ofertas';
+				if (textQuery.includes('lista') || textQuery.includes('carrinho')) targetId = 'lista';
+
+				goToTarget(targetId);
+			});
+
+			searchInput?.addEventListener('input', () => {
+				if (!(searchInput instanceof HTMLInputElement)) return;
+				renderSuggestions(searchInput.value);
+			});
+
+			searchInput?.addEventListener('focus', () => {
+				if (!(searchInput instanceof HTMLInputElement)) return;
+				renderSuggestions(searchInput.value);
+			});
+
+			searchInput?.addEventListener('keydown', (event) => {
+				if (event.key === 'Escape') hideSuggestions();
+			});
+
+			searchSuggestions?.addEventListener('click', (event) => {
+				const target = event.target;
+				if (!(target instanceof Element) || !(searchInput instanceof HTMLInputElement)) return;
+				const option = target.closest('[data-suggestion]');
+				if (!(option instanceof HTMLElement)) return;
+
+				const value = option.getAttribute('data-suggestion') ?? '';
+				const suggestionType = option.getAttribute('data-suggestion-type') ?? 'product';
+				if (suggestionType === 'tag') {
+					applyTagToInput(value);
+					return;
+				}
+				searchInput.value = value;
+				hideSuggestions();
+				searchInput.focus();
+			});
+		}
+	</script>
+</header>

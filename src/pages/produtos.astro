@@ -1,0 +1,482 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import SectionTitle from '../components/SectionTitle.astro';
+import ProductCard from '../components/ProductCard.astro';
+import WhatsappFloat from '../components/WhatsappFloat.astro';
+import { productTabs } from '../data/products';
+import { offers } from '../data/offers';
+
+const homePath = import.meta.env.BASE_URL;
+
+const normalizeTag = (value: string) =>
+	value
+		.toLowerCase()
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.replace(/[^\w\s-]/g, '')
+		.trim();
+
+const productsFromTabs = productTabs.flatMap((tab) =>
+	tab.products.map((product) => ({
+		product,
+		tags: Array.from(
+			new Set([
+				...(product.tags ?? []),
+				product.badge,
+				product.sector,
+				product.productType,
+				product.brand,
+				tab.label,
+			].map(normalizeTag).filter(Boolean))
+		),
+	}))
+);
+
+const productsFromOffers = offers.map((offer) => {
+	const offerTag = normalizeTag(offer.label);
+	const normalizedName = normalizeTag(offer.name);
+	const firstWordTag = normalizeTag(offer.name.split(' ')[0] ?? '');
+	const product = {
+		name: offer.name,
+		description: offer.subtitle,
+		price: offer.price,
+		oldPrice: offer.oldPrice,
+		unit: offer.unit,
+		badge: offer.label,
+		visual: offer.visual,
+		sector: offer.label,
+		productType: firstWordTag || 'produto',
+		brand: 'ofertas da semana',
+		tags: [offerTag, normalizedName, firstWordTag].filter(Boolean),
+	};
+
+	return {
+		product,
+		tags: product.tags,
+	};
+});
+
+const allProducts = [...productsFromTabs, ...productsFromOffers].map((item) => ({
+	product: item.product,
+	tags: item.tags,
+	search: [
+		item.product.name,
+		item.product.description,
+		item.product.unit,
+		item.product.badge,
+		...(item.tags ?? []),
+	]
+		.join(' ')
+		.toLowerCase(),
+}));
+
+const allAvailableTags = Array.from(
+	new Set(allProducts.flatMap((item) => item.tags.map(normalizeTag)).filter(Boolean)),
+).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+---
+
+<BaseLayout
+	title="Todos os produtos | Nome da sua empresa"
+	description="Pagina com todos os produtos do mercado, com busca simples e visual otimizado para celular."
+	keywords="todos os produtos, catalogo de mercado, busca de produtos, supermercado local"
+	canonical="produtos/"
+>
+	<Header homePath={homePath} />
+
+	<main id="conteudo">
+		<section class="section section--soft catalog-page" id="todos-produtos" data-product-page>
+			<div class="container">
+				<SectionTitle
+					eyebrow="Catalogo completo"
+					title="Veja todos os produtos em uma pagina"
+					description="Digite no campo e toque em Buscar para filtrar rapidamente."
+				/>
+
+				<div class="catalog-page__controls">
+					<form class="catalog-page-search" data-product-search-form>
+						<label class="sr-only" for="product-page-input">Buscar produtos</label>
+						<div class="catalog-page-search__field">
+							<input
+								id="product-page-input"
+								type="search"
+								placeholder="Exemplo: arroz ou #feijao #despensa"
+								aria-autocomplete="list"
+								aria-expanded="false"
+								aria-controls="catalog-search-suggestions"
+								autocomplete="off"
+								spellcheck="false"
+								data-product-search-input
+							/>
+							<ul
+								class="catalog-page-search__suggestions"
+								id="catalog-search-suggestions"
+								data-product-search-suggestions
+								role="listbox"
+								hidden
+							></ul>
+						</div>
+						<button class="button button--primary" type="submit">Buscar</button>
+					</form>
+
+					<div class="catalog-page__tag-state" data-product-tag-state hidden>
+						<span>
+							Tags selecionadas:
+							<strong data-product-tag-label></strong>
+						</span>
+						<button class="button button--outline" type="button" data-product-clear-tag>Limpar tags</button>
+					</div>
+
+					<div class="catalog-page__actions">
+						<a class="button button--outline" href={`${homePath}#destaques`}>Voltar para o inicio</a>
+						<p class="catalog-page__status" data-product-search-status>Mostrando {allProducts.length} produto(s).</p>
+					</div>
+				</div>
+
+				<div class="product-grid catalog-page-grid">
+					{allProducts.map((item) => (
+						<div class="catalog-page-item" data-product-item data-search={item.search} data-tags={item.tags.join('|')}>
+							<ProductCard product={item.product} />
+						</div>
+					))}
+				</div>
+			</div>
+
+			<script type="application/json" data-product-tags set:html={JSON.stringify(allAvailableTags)}></script>
+
+			<script is:inline>
+				const page = document.querySelector('[data-product-page]');
+
+				if (page instanceof HTMLElement) {
+					const form = page.querySelector('[data-product-search-form]');
+					const input = page.querySelector('[data-product-search-input]');
+					const suggestions = page.querySelector('[data-product-search-suggestions]');
+					const tagsJson = page.querySelector('[data-product-tags]');
+					const status = page.querySelector('[data-product-search-status]');
+					const tagState = page.querySelector('[data-product-tag-state]');
+					const tagLabel = page.querySelector('[data-product-tag-label]');
+					const clearTagButton = page.querySelector('[data-product-clear-tag]');
+					const items = page.querySelectorAll('[data-product-item]');
+					const MAX_TAGS = 3;
+					let availableTags = [];
+
+					try {
+						if (tagsJson instanceof HTMLScriptElement) {
+							const parsed = JSON.parse(tagsJson.textContent ?? '[]');
+							availableTags = Array.isArray(parsed) ? parsed : [];
+						}
+					} catch {
+						availableTags = [];
+					}
+
+					const normalizeText = (value = '') =>
+						value
+							.toLowerCase()
+							.normalize('NFD')
+							.replace(/[\u0300-\u036f]/g, '')
+							.replace(/[^\w\s-]/g, ' ')
+							.replace(/\s+/g, ' ')
+							.trim();
+
+					const parseTagTokens = (value = '') => {
+						const matches = value.match(/#([^\s#]+)/g) ?? [];
+						const uniqueTags = [];
+
+						matches.forEach((token) => {
+							const normalized = normalizeText(token.replace(/^#/, ''));
+							if (!normalized || uniqueTags.includes(normalized)) return;
+							uniqueTags.push(normalized);
+						});
+
+						return uniqueTags;
+					};
+
+					const stripTagTokens = (value = '') =>
+						value
+							.replace(/#[^\s#]+/g, ' ')
+							.replace(/\s+/g, ' ')
+							.trim();
+
+					const getTagPartial = (value = '') => {
+						const hashIndex = value.lastIndexOf('#');
+						if (hashIndex < 0) return '';
+						const partial = value.slice(hashIndex + 1);
+						if (/\s/.test(partial)) return '';
+						return normalizeText(partial);
+					};
+
+					const buildInputValueWithTags = (queryText = '', tags = []) => {
+						const cleanText = stripTagTokens(queryText);
+						const cleanTags = tags.slice(0, MAX_TAGS).map((tag) => `#${tag}`);
+						return [cleanText, ...cleanTags].filter(Boolean).join(' ').trim();
+					};
+
+					const hideSuggestions = () => {
+						if (!(suggestions instanceof HTMLElement)) return;
+						suggestions.hidden = true;
+						suggestions.innerHTML = '';
+						if (input instanceof HTMLInputElement) {
+							input.setAttribute('aria-expanded', 'false');
+						}
+					};
+
+					const findTagSuggestions = (value = '') => {
+						const selectedTags = parseTagTokens(value);
+						const partialTag = getTagPartial(value);
+						if (!value.includes('#')) return [];
+						if (selectedTags.length >= MAX_TAGS && !partialTag) return [];
+
+						const candidates = availableTags.filter(
+							(tag) => !selectedTags.includes(tag) || tag === partialTag,
+						);
+
+						if (!partialTag) return candidates.slice(0, 8);
+						return candidates
+							.filter((tag) => tag.startsWith(partialTag) || tag.includes(partialTag))
+							.slice(0, 8);
+					};
+
+					const renderTagSuggestions = () => {
+						if (!(input instanceof HTMLInputElement) || !(suggestions instanceof HTMLElement)) return;
+						const currentValue = input.value;
+						const selectedTags = parseTagTokens(currentValue);
+						const matches = findTagSuggestions(currentValue);
+						suggestions.innerHTML = '';
+
+						if (!matches.length) {
+							if (currentValue.includes('#') && selectedTags.length >= MAX_TAGS) {
+								const item = document.createElement('li');
+								const hint = document.createElement('span');
+								hint.className = 'catalog-page-search__suggestion catalog-page-search__suggestion--hint';
+								hint.textContent = 'Limite de 3 tags atingido.';
+								item.appendChild(hint);
+								suggestions.appendChild(item);
+								suggestions.hidden = false;
+								input.setAttribute('aria-expanded', 'true');
+								return;
+							}
+							hideSuggestions();
+							return;
+						}
+
+						matches.forEach((tag) => {
+							const item = document.createElement('li');
+							const button = document.createElement('button');
+							button.type = 'button';
+							button.className = 'catalog-page-search__suggestion catalog-page-search__suggestion--tag';
+							button.textContent = `#${tag}`;
+							button.setAttribute('data-product-suggestion-tag', tag);
+							button.setAttribute('role', 'option');
+							item.appendChild(button);
+							suggestions.appendChild(item);
+						});
+
+						suggestions.hidden = false;
+						input.setAttribute('aria-expanded', 'true');
+					};
+
+					const readInitialState = () => {
+						const params = new URLSearchParams(window.location.search);
+						const queryParam = params.get('q') ?? '';
+						const legacyTag = normalizeText(params.get('tag') ?? '');
+						const tagsParam = (params.get('tags') ?? '')
+							.split(',')
+							.map((tag) => normalizeText(tag))
+							.filter(Boolean);
+						const tagsFromQuery = parseTagTokens(queryParam);
+						const normalizedTags = Array.from(
+							new Set([...tagsParam, ...(legacyTag ? [legacyTag] : []), ...tagsFromQuery]),
+						).slice(0, MAX_TAGS);
+
+						return {
+							query: stripTagTokens(queryParam),
+							tags: normalizedTags,
+						};
+					};
+
+					const updateUrl = (queryRaw = '', tagsRaw = []) => {
+						const query = stripTagTokens(queryRaw.trim());
+						const tags = Array.from(
+							new Set(
+								(Array.isArray(tagsRaw) ? tagsRaw : [tagsRaw])
+									.map((tag) => normalizeText(tag))
+									.filter(Boolean),
+							),
+						).slice(0, MAX_TAGS);
+						const nextUrl = new URL(window.location.href);
+
+						if (query) {
+							nextUrl.searchParams.set('q', query);
+						} else {
+							nextUrl.searchParams.delete('q');
+						}
+
+						if (tags.length) {
+							nextUrl.searchParams.set('tags', tags.join(','));
+						} else {
+							nextUrl.searchParams.delete('tags');
+						}
+						nextUrl.searchParams.delete('tag');
+
+						window.history.replaceState({}, '', nextUrl.toString());
+					};
+
+					let selectedTags = [];
+
+					const renderTagState = () => {
+						if (!(tagState instanceof HTMLElement) || !(tagLabel instanceof HTMLElement)) return;
+						const hasTags = selectedTags.length > 0;
+						tagState.hidden = !hasTags;
+						tagLabel.textContent = hasTags ? selectedTags.map((tag) => `#${tag}`).join(', ') : '';
+					};
+
+					const filterItems = (queryRaw = '', tagsRaw = selectedTags) => {
+						const query = normalizeText(stripTagTokens(queryRaw));
+						const activeTags = Array.from(
+							new Set(
+								(Array.isArray(tagsRaw) ? tagsRaw : [tagsRaw])
+									.map((tag) => normalizeText(tag))
+									.filter(Boolean),
+							),
+						).slice(0, MAX_TAGS);
+						let visible = 0;
+
+						items.forEach((item) => {
+							const searchText = normalizeText(item.getAttribute('data-search') ?? '');
+							const tags = (item.getAttribute('data-tags') ?? '')
+								.split('|')
+								.map((tag) => normalizeText(tag))
+								.filter(Boolean);
+							const matchesQuery = !query || searchText.includes(query);
+							const matchesTags =
+								activeTags.length === 0 ||
+								activeTags.every((activeTag) => tags.includes(activeTag));
+							const matches = matchesQuery && matchesTags;
+							item.toggleAttribute('hidden', !matches);
+							if (matches) visible += 1;
+						});
+
+						if (!(status instanceof HTMLElement)) return;
+
+						status.classList.remove('is-warning');
+						if (!query && !activeTags.length) {
+							status.textContent = `Mostrando ${visible} produto(s).`;
+							return;
+						}
+
+						const tagsText = activeTags.map((tag) => `#${tag}`).join(', ');
+
+						if (!visible) {
+							if (query && activeTags.length) {
+								status.textContent = `Nao encontrei resultados para "${query}" com as tags ${tagsText}.`;
+							} else if (activeTags.length) {
+								status.textContent = `Nao encontrei produtos com as tags ${tagsText}.`;
+							} else {
+								status.textContent = `Nao encontrei "${query}". Tente outro nome.`;
+							}
+							status.classList.add('is-warning');
+							return;
+						}
+
+						if (query && activeTags.length) {
+							status.textContent = `Mostrando ${visible} resultado(s) para "${query}" com as tags ${tagsText}.`;
+							return;
+						}
+
+						if (activeTags.length) {
+							status.textContent = `Mostrando ${visible} produto(s) com as tags ${tagsText}.`;
+							return;
+						}
+
+						status.textContent = `Mostrando ${visible} resultado(s) para "${query}".`;
+					};
+
+					form?.addEventListener('submit', (event) => {
+						event.preventDefault();
+						if (!(input instanceof HTMLInputElement)) return;
+						selectedTags = parseTagTokens(input.value);
+						updateUrl(input.value, selectedTags);
+						filterItems(input.value, selectedTags);
+						renderTagState();
+						renderTagSuggestions();
+					});
+
+					if (input instanceof HTMLInputElement) {
+						input.addEventListener('input', () => {
+							selectedTags = parseTagTokens(input.value);
+							if (selectedTags.length > MAX_TAGS) {
+								selectedTags = selectedTags.slice(0, MAX_TAGS);
+								input.value = buildInputValueWithTags(input.value, selectedTags);
+							}
+							renderTagState();
+							updateUrl(input.value, selectedTags);
+							filterItems(input.value, selectedTags);
+							renderTagSuggestions();
+						});
+						input.addEventListener('focus', renderTagSuggestions);
+						input.addEventListener('keydown', (event) => {
+							if (event.key === 'Escape') hideSuggestions();
+						});
+					}
+
+					clearTagButton?.addEventListener('click', () => {
+						selectedTags = [];
+						if (input instanceof HTMLInputElement) {
+							input.value = stripTagTokens(input.value);
+						}
+						renderTagState();
+						const query = input instanceof HTMLInputElement ? input.value : '';
+						updateUrl(query, selectedTags);
+						filterItems(query, selectedTags);
+						hideSuggestions();
+					});
+
+					suggestions?.addEventListener('click', (event) => {
+						const target = event.target;
+						if (!(target instanceof Element) || !(input instanceof HTMLInputElement)) return;
+						const option = target.closest('[data-product-suggestion-tag]');
+						if (!(option instanceof HTMLElement)) return;
+
+						const tag = normalizeText(option.getAttribute('data-product-suggestion-tag') ?? '');
+						if (!tag) return;
+						const partialTag = getTagPartial(input.value);
+						const existingTags = parseTagTokens(input.value).filter(
+							(item) => item !== tag && item !== partialTag,
+						);
+						if (existingTags.length >= MAX_TAGS) {
+							existingTags.length = MAX_TAGS - 1;
+						}
+						selectedTags = [...existingTags, tag].slice(0, MAX_TAGS);
+						input.value = `${buildInputValueWithTags(input.value, selectedTags)} `;
+						renderTagState();
+						updateUrl(input.value, selectedTags);
+						filterItems(input.value, selectedTags);
+						renderTagSuggestions();
+						input.focus();
+					});
+
+					document.addEventListener('click', (event) => {
+						const target = event.target;
+						if (!(target instanceof Node)) return;
+						if (form instanceof HTMLElement && !form.contains(target)) {
+							hideSuggestions();
+						}
+					});
+
+					const initialState = readInitialState();
+					selectedTags = initialState.tags;
+					if (input instanceof HTMLInputElement) {
+						input.value = buildInputValueWithTags(initialState.query, selectedTags);
+					}
+					renderTagState();
+					updateUrl(initialState.query, selectedTags);
+					filterItems(initialState.query, selectedTags);
+				}
+			</script>
+		</section>
+	</main>
+
+	<Footer homePath={homePath} />
+	<WhatsappFloat />
+</BaseLayout>

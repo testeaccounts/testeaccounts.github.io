@@ -1,0 +1,130 @@
+---
+import { buildWhatsAppLink, company, heroSlides } from '../data/site';
+import Icon from './Icon.astro';
+import ProductVisual from './ProductVisual.astro';
+---
+
+<section class="hero" id="inicio" data-hero>
+	<div class="container">
+		<div class="hero__slider">
+			{heroSlides.map((slide, index) => {
+				const isWhatsAppSlide = slide.id === 'whatsapp';
+				const isPascoaSlide = slide.id === 'pascoa';
+				const primaryHref = isWhatsAppSlide ? buildWhatsAppLink(`Ola! Quero atendimento rapido no ${company.name}.`) : isPascoaSlide ? '#ofertas' : '#lista';
+				const secondaryHref = isPascoaSlide
+					? buildWhatsAppLink(`Ola! Quero aproveitar as ofertas do ${company.name}.`)
+					: slide.id === 'hortifruti'
+						? '#setor-hortifruti'
+						: '#lista';
+				const secondaryBlank = secondaryHref.startsWith('https://wa.me');
+				const secondaryButtonClass = secondaryBlank ? 'button button--whatsapp' : 'button button--ghost';
+
+				return (
+					<article class:list={['hero__slide', `hero__slide--${slide.theme}`, index === 0 && 'is-active']} data-hero-slide aria-hidden={index === 0 ? 'false' : 'true'}>
+						<div class="hero__copy">
+							<div class="hero__tagline">
+								<span>{slide.tag}</span>
+								<strong>{slide.highlight}</strong>
+							</div>
+							<h1>{slide.title}</h1>
+							<p>{slide.description}</p>
+							<div class="hero__actions">
+								<a class="button button--light" href={primaryHref} target={primaryHref.startsWith('https://wa.me') ? '_blank' : undefined} rel="noreferrer">
+									{slide.primaryCta}
+								</a>
+								<a class={secondaryButtonClass} href={secondaryHref} target={secondaryBlank ? '_blank' : undefined} rel={secondaryBlank ? 'noreferrer' : undefined}>
+									{secondaryBlank && <Icon name="whatsapp" />}
+									{slide.secondaryCta}
+								</a>
+							</div>
+							<ul class="hero__services">
+								<li><Icon name="pickup" /> Retire na loja</li>
+								<li><Icon name="delivery" /> Entrega local</li>
+								<li><Icon name="whatsapp" /> Pedido rapido</li>
+							</ul>
+						</div>
+
+						<div class="hero__visuals">
+							<div class="hero__visual-card hero__visual-card--left">
+								<ProductVisual type={slide.visuals[0].type} label={slide.visuals[0].label} size="hero" />
+							</div>
+							<div class="hero__visual-card hero__visual-card--right">
+								<ProductVisual type={slide.visuals[1].type} label={slide.visuals[1].label} size="hero" />
+							</div>
+						</div>
+					</article>
+				);
+			})}
+
+			<button class="hero__arrow hero__arrow--left" type="button" data-hero-prev aria-label="Slide anterior">
+				<Icon name="chevron-left" />
+			</button>
+			<button class="hero__arrow hero__arrow--right" type="button" data-hero-next aria-label="Proximo slide">
+				<Icon name="chevron-right" />
+			</button>
+		</div>
+
+		<div class="hero__dots">
+			{heroSlides.map((slide, index) => (
+				<button class:list={['hero__dot', index === 0 && 'is-active']} type="button" aria-label={`Ir para ${slide.tag}`} data-hero-dot data-index={index}></button>
+			))}
+		</div>
+	</div>
+
+	<script is:inline>
+		const hero = document.querySelector('[data-hero]');
+
+		if (hero instanceof HTMLElement) {
+			const slides = Array.from(hero.querySelectorAll('[data-hero-slide]'));
+			const dots = Array.from(hero.querySelectorAll('[data-hero-dot]'));
+			const prev = hero.querySelector('[data-hero-prev]');
+			const next = hero.querySelector('[data-hero-next]');
+			const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+			let current = 0;
+			let timer;
+
+			const render = (index) => {
+				current = (index + slides.length) % slides.length;
+				slides.forEach((slide, slideIndex) => {
+					slide.classList.toggle('is-active', slideIndex === current);
+					slide.setAttribute('aria-hidden', slideIndex === current ? 'false' : 'true');
+				});
+				dots.forEach((dot, dotIndex) => dot.classList.toggle('is-active', dotIndex === current));
+			};
+
+			const play = () => {
+				if (reducedMotion) return;
+				window.clearInterval(timer);
+				timer = window.setInterval(() => render(current + 1), 6000);
+			};
+
+			prev?.addEventListener('click', () => {
+				render(current - 1);
+				play();
+			});
+
+			next?.addEventListener('click', () => {
+				render(current + 1);
+				play();
+			});
+
+			dots.forEach((dot, index) => {
+				dot.addEventListener('click', () => {
+					render(index);
+					play();
+				});
+			});
+
+			document.addEventListener('visibilitychange', () => {
+				if (document.hidden) {
+					window.clearInterval(timer);
+				} else {
+					play();
+				}
+			});
+
+			render(0);
+			play();
+		}
+	</script>
+</section>

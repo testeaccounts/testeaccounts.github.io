@@ -1,0 +1,30 @@
+---
+import { categories } from '../data/categories';
+import ProductVisual from './ProductVisual.astro';
+import SectionTitle from './SectionTitle.astro';
+---
+
+<section class="section categories" id="categorias">
+	<div class="container">
+		<SectionTitle
+			eyebrow="Setores da loja"
+			title="Escolha o setor e va direto para os produtos"
+			description="Tudo separado para ficar facil de achar no celular."
+			align="center"
+		/>
+
+		<div class="category-grid">
+			{categories.map((category) => (
+				<a class="category-card" href={category.href}>
+					<div class="category-card__media">
+						<ProductVisual type={category.icon} label={category.name} size="mini" />
+					</div>
+					<div class="category-card__content">
+						<h3>{category.name}</h3>
+						<p>{category.description}</p>
+					</div>
+				</a>
+			))}
+		</div>
+	</div>
+</section>

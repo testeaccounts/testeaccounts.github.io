@@ -1,0 +1,58 @@
+---
+import ProductVisual from './ProductVisual.astro';
+
+interface Props {
+	offer: {
+		name: string;
+		subtitle: string;
+		price: number;
+		oldPrice: number;
+		unit: string;
+		visual: string;
+		label: string;
+	};
+}
+
+const { offer } = Astro.props;
+const formatPrice = (value: number) =>
+	new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+const savings = offer.oldPrice - offer.price;
+const basePath = import.meta.env.BASE_URL;
+
+const normalizeTag = (value: string) =>
+	value
+		.toLowerCase()
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.replace(/[^\w\s-]/g, '')
+		.trim();
+
+const labelTag = normalizeTag(offer.label || offer.name);
+const labelHref = `${basePath}produtos/?tag=${encodeURIComponent(labelTag)}`;
+---
+
+<article class="offer-card">
+	<div class="offer-card__head">
+		<a class="offer-card__tag-link" href={labelHref}>#{offer.label}</a>
+		<ProductVisual type={offer.visual} label={offer.unit} />
+	</div>
+	<div class="offer-card__body">
+		<h3>{offer.name}</h3>
+		<p>{offer.subtitle}</p>
+		<div class="offer-card__price">
+			<small>{formatPrice(offer.oldPrice)}</small>
+			<strong>{formatPrice(offer.price)}</strong>
+		</div>
+		<div class="offer-card__saving">Economize {formatPrice(savings)}</div>
+	</div>
+	<button
+		class="button button--green button--block"
+		type="button"
+		data-add-to-list
+		data-name={offer.name}
+		data-unit={offer.unit}
+		data-price={formatPrice(offer.price)}
+	>
+		Adicionar a lista
+	</button>
+</article>

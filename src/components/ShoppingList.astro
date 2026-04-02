@@ -1,0 +1,307 @@
+---
+import { buildWhatsAppLink, company } from '../data/site';
+import Icon from './Icon.astro';
+import SectionTitle from './SectionTitle.astro';
+
+const supportHref = buildWhatsAppLink(`Ola! Quero montar meu pedido no ${company.name}.`);
+---
+
+<section class="section shopping-list" id="lista">
+	<div class="container shopping-list__grid">
+		<div>
+			<SectionTitle
+				eyebrow="Monte sua lista"
+				title="Escolha os produtos e envie seu pedido no WhatsApp"
+				description="A lista salva os itens, voce muda as quantidades e finaliza quando quiser."
+			/>
+
+			<div class="shopping-list__steps">
+				<article><strong>1</strong><span>Toque em "Adicionar a lista".</span></article>
+				<article><strong>2</strong><span>Abra sua lista e ajuste a quantidade.</span></article>
+				<article><strong>3</strong><span>Envie para o WhatsApp da loja.</span></article>
+			</div>
+
+			<div class="shopping-list__actions">
+				<button class="button button--primary" type="button" data-list-toggle>
+					<Icon name="basket" />
+					<span>Ver minha lista</span>
+					<strong class="button__badge" data-list-count>0</strong>
+				</button>
+				<a class="button button--outline" href={supportHref} target="_blank" rel="noreferrer">Falar com a loja</a>
+			</div>
+		</div>
+
+		<div class="shopping-list__preview">
+			<div class="shopping-list__preview-card">
+				<span>Exemplo</span>
+				<strong>Pedido pronto para enviar</strong>
+				<div>
+					<p>Arroz Tipo 1 5kg</p>
+					<b>1x</b>
+				</div>
+				<div>
+					<p>Leite Integral 1L</p>
+					<b>3x</b>
+				</div>
+				<div>
+					<p>Banana Prata</p>
+					<b>2kg</b>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<div class="list-overlay" data-list-overlay hidden></div>
+
+<aside class="list-drawer" data-list-drawer aria-hidden="true">
+	<div class="list-drawer__top">
+		<div>
+			<span>Minha lista</span>
+			<h3>Meu pedido</h3>
+		</div>
+		<button class="list-drawer__close" type="button" data-list-close aria-label="Fechar lista">
+			<span class="list-drawer__close-mark" aria-hidden="true">×</span>
+		</button>
+	</div>
+
+	<p class="list-drawer__text">Confira os itens e envie para a loja.</p>
+
+	<div class="list-drawer__body">
+		<ul class="list-items" data-list-items hidden></ul>
+		<div class="list-empty" data-list-empty>
+			<Icon name="basket" />
+			<strong>Sua lista esta vazia</strong>
+			<p>Adicione produtos para montar seu pedido.</p>
+		</div>
+	</div>
+
+	<div class="list-drawer__footer">
+		<div class="list-drawer__summary">
+			<div class="list-drawer__summary-block">
+				<strong data-list-count>0</strong>
+				<span>itens selecionados</span>
+			</div>
+			<div class="list-drawer__summary-block">
+				<strong data-list-total>R$ 0,00</strong>
+				<span>total estimado</span>
+			</div>
+		</div>
+		<div class="list-drawer__buttons">
+			<button class="button button--outline button--block" type="button" data-list-clear>Limpar lista</button>
+			<button class="button button--green button--block" type="button" data-list-send>Enviar no WhatsApp</button>
+		</div>
+	</div>
+</aside>
+
+<button class="list-fab" type="button" data-list-toggle aria-label="Abrir lista de compras">
+	<Icon name="basket" />
+	<span class="list-fab__text">Minha lista</span>
+	<strong class="list-fab__count" data-list-count>0</strong>
+</button>
+
+<div class="sr-only" data-list-live aria-live="polite"></div>
+
+<script is:inline>
+	const drawer = document.querySelector('[data-list-drawer]');
+	const storageKey = 'mercado-lista-compra';
+
+	if (drawer instanceof HTMLElement) {
+		const overlay = document.querySelector('[data-list-overlay]');
+		const closeButton = drawer.querySelector('[data-list-close]');
+		const clearButton = drawer.querySelector('[data-list-clear]');
+		const sendButton = drawer.querySelector('[data-list-send]');
+		const listItems = drawer.querySelector('[data-list-items]');
+		const emptyState = drawer.querySelector('[data-list-empty]');
+		const totalTarget = drawer.querySelector('[data-list-total]');
+		const liveRegion = document.querySelector('[data-list-live]');
+		const countTargets = document.querySelectorAll('[data-list-count]');
+		const toggleButtons = document.querySelectorAll('[data-list-toggle]');
+		let items = [];
+
+		try {
+			const parsed = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
+			items = Array.isArray(parsed) ? parsed : [];
+		} catch {
+			items = [];
+		}
+
+		const announce = (message) => {
+			if (liveRegion instanceof HTMLElement) liveRegion.textContent = message;
+		};
+
+		const save = () => localStorage.setItem(storageKey, JSON.stringify(items));
+		const totalItems = () => items.reduce((sum, item) => sum + item.quantity, 0);
+		const formatCurrency = (value) =>
+			new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+		const parseCurrency = (value) => {
+			const normalized = String(value ?? '')
+				.replace(/\s/g, '')
+				.replace('R$', '')
+				.replace(/\./g, '')
+				.replace(',', '.')
+				.replace(/[^\d.-]/g, '');
+			const parsed = Number(normalized);
+			return Number.isFinite(parsed) ? parsed : 0;
+		};
+		const totalValue = () =>
+			items.reduce((sum, item) => sum + parseCurrency(item.price) * Math.max(Number(item.quantity) || 0, 0), 0);
+
+		const syncSummary = () => {
+			const count = String(totalItems());
+			countTargets.forEach((target) => {
+				target.textContent = count;
+			});
+			if (totalTarget instanceof HTMLElement) {
+				totalTarget.textContent = formatCurrency(totalValue());
+			}
+		};
+
+		const openDrawer = () => {
+			drawer.classList.add('is-open');
+			drawer.setAttribute('aria-hidden', 'false');
+			document.body.classList.add('drawer-open');
+			if (overlay instanceof HTMLElement) overlay.hidden = false;
+		};
+
+		const closeDrawer = () => {
+			drawer.classList.remove('is-open');
+			drawer.setAttribute('aria-hidden', 'true');
+			document.body.classList.remove('drawer-open');
+			if (overlay instanceof HTMLElement) overlay.hidden = true;
+		};
+
+		const render = () => {
+			if (!(listItems instanceof HTMLUListElement) || !(emptyState instanceof HTMLElement)) return;
+
+			listItems.innerHTML = '';
+			const isEmpty = items.length === 0;
+
+			if (isEmpty) {
+				listItems.hidden = true;
+				emptyState.hidden = false;
+				listItems.classList.add('is-hidden');
+				emptyState.classList.remove('is-hidden');
+				listItems.style.display = 'none';
+				emptyState.style.display = '';
+				syncSummary();
+				return;
+			}
+
+			listItems.hidden = false;
+			emptyState.hidden = true;
+			listItems.classList.remove('is-hidden');
+			emptyState.classList.add('is-hidden');
+			listItems.style.display = '';
+			emptyState.style.display = 'none';
+
+			items.forEach((item) => {
+				const row = document.createElement('li');
+				row.className = 'list-item';
+				row.innerHTML = `
+					<div class="list-item__head">
+						<div>
+							<strong>${item.name}</strong>
+							<p>${item.unit} • ${item.price}</p>
+						</div>
+						<button type="button" data-remove-item="${item.name}">Remover</button>
+					</div>
+					<div class="list-item__foot">
+						<div class="list-counter">
+							<button type="button" data-decrease-item="${item.name}" aria-label="Diminuir quantidade">-</button>
+							<span>${item.quantity}</span>
+							<button type="button" data-increase-item="${item.name}" aria-label="Aumentar quantidade">+</button>
+						</div>
+						<small>Pronto para atendimento</small>
+					</div>
+				`;
+				listItems.appendChild(row);
+			});
+
+			syncSummary();
+		};
+
+		const updateItem = (name, change) => {
+			items = items
+				.map((item) => item.name === name ? { ...item, quantity: item.quantity + change } : item)
+				.filter((item) => item.quantity > 0);
+			save();
+			render();
+		};
+
+		toggleButtons.forEach((button) => button.addEventListener('click', openDrawer));
+		closeButton?.addEventListener('click', closeDrawer);
+		overlay?.addEventListener('click', closeDrawer);
+
+		document.addEventListener('keydown', (event) => {
+			if (event.key === 'Escape') closeDrawer();
+		});
+
+		clearButton?.addEventListener('click', () => {
+			items = [];
+			save();
+			render();
+			announce('Lista limpa');
+		});
+
+		sendButton?.addEventListener('click', () => {
+			if (!items.length) {
+				openDrawer();
+				announce('Adicione produtos antes de finalizar');
+				return;
+			}
+
+			const lines = items.map((item, index) => `${index + 1}. ${item.name} - ${item.quantity}x (${item.unit}) - ${item.price}`);
+			const total = formatCurrency(totalValue());
+			const message = `Ola! Quero pedir os itens abaixo no Nome da sua empresa:\n\n${lines.join('\n')}\n\nTotal estimado: ${total}\n\nPode confirmar disponibilidade, retirada ou entrega?`;
+			window.open(`https://wa.me/5500000000000?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
+		});
+
+		document.addEventListener('click', (event) => {
+			const target = event.target;
+			if (!(target instanceof Element)) return;
+
+			const addButton = target.closest('[data-add-to-list]');
+			if (addButton instanceof HTMLElement) {
+				const name = addButton.getAttribute('data-name') ?? 'Produto';
+				const unit = addButton.getAttribute('data-unit') ?? 'Unidade';
+				const price = addButton.getAttribute('data-price') ?? 'R$ 0,00';
+				const existing = items.find((item) => item.name === name);
+
+				if (existing) {
+					existing.quantity += 1;
+				} else {
+					items.push({ name, unit, price, quantity: 1 });
+				}
+
+				save();
+				render();
+				openDrawer();
+				announce(`${name} adicionado a lista`);
+				return;
+			}
+
+			const removeButton = target.closest('[data-remove-item]');
+			if (removeButton instanceof HTMLElement) {
+				const name = removeButton.getAttribute('data-remove-item') ?? '';
+				items = items.filter((item) => item.name !== name);
+				save();
+				render();
+				return;
+			}
+
+			const increaseButton = target.closest('[data-increase-item]');
+			if (increaseButton instanceof HTMLElement) {
+				updateItem(increaseButton.getAttribute('data-increase-item') ?? '', 1);
+				return;
+			}
+
+			const decreaseButton = target.closest('[data-decrease-item]');
+			if (decreaseButton instanceof HTMLElement) {
+				updateItem(decreaseButton.getAttribute('data-decrease-item') ?? '', -1);
+			}
+		});
+
+		render();
+	}
+</script>

@@ -1,0 +1,56 @@
+---
+import { productTabs } from '../data/products';
+import ProductCard from './ProductCard.astro';
+import SectionTitle from './SectionTitle.astro';
+
+const highlights = productTabs.find((tab) => tab.id === 'destaques');
+const sectors = productTabs.filter((tab) => tab.id !== 'destaques');
+const productsPageHref = `${import.meta.env.BASE_URL}produtos/`;
+
+const sectorAnchorById: Record<string, string> = {
+	hortifruti: 'setor-hortifruti',
+	padaria: 'setor-padaria',
+	limpeza: 'setor-limpeza',
+};
+---
+
+<section class="section section--soft" id="destaques">
+	<div class="container">
+		<SectionTitle
+			eyebrow="Destaques do dia"
+			title="Produtos em oferta para facilitar sua compra"
+			description="Preco facil de ver e botao grande para adicionar na lista."
+			align="center"
+		/>
+
+		<div class="catalog-panel catalog-panel--compact" id="produtos">
+			<p class="catalog-panel__text">Quer ver tudo em uma pagina so, com busca e lista completa?</p>
+			<a class="button button--outline catalog-panel__link" href={productsPageHref}>Ver todos os produtos</a>
+		</div>
+
+		{highlights && (
+			<div class="product-grid">
+				{highlights.products.map((product) => (
+					<ProductCard product={product} />
+				))}
+			</div>
+		)}
+	</div>
+</section>
+
+{sectors.map((sector) => (
+	<section class="section section--tight sector-block" id={sectorAnchorById[sector.id] ?? `setor-${sector.id}`}>
+		<div class="container">
+			<SectionTitle
+				eyebrow={sector.label}
+				title={`Setor de ${sector.label}`}
+				description="Tudo separado para voce achar mais rapido."
+			/>
+			<div class="product-grid">
+				{sector.products.map((product) => (
+					<ProductCard product={product} />
+				))}
+			</div>
+		</div>
+	</section>
+))}

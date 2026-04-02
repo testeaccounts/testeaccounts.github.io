@@ -1,0 +1,116 @@
+---
+import '../styles/global.css';
+import { company } from '../data/site';
+
+interface Props {
+	title?: string;
+	description?: string;
+	keywords?: string;
+	canonical?: string;
+	ogImage?: string;
+}
+
+const {
+	title = `${company.name} | Mercado com ofertas e WhatsApp`,
+	description = 'Site de mercado com foco no celular, ofertas da semana, setores separados e lista de compras no WhatsApp.',
+	keywords = `mercado local, supermercado com entrega, ofertas de supermercado, mercado com WhatsApp, supermercado na sua cidade, ${company.name}`,
+	canonical,
+	ogImage = '/og-market.svg',
+} = Astro.props;
+
+const basePath = import.meta.env.BASE_URL;
+const isAbsoluteUrl = (value: string) => /^[a-z][a-z\\d+.-]*:/i.test(value);
+const withBase = (path: string) => {
+	const cleanPath = path.replace(/^\/+/, '');
+	return cleanPath ? `${basePath}${cleanPath}` : basePath;
+};
+
+const canonicalUrl = (() => {
+	if (!canonical) return Astro.url.toString();
+	if (isAbsoluteUrl(canonical)) return canonical;
+	const resolved = withBase(canonical);
+	return Astro.site ? new URL(resolved, Astro.site).toString() : new URL(resolved, Astro.url).toString();
+})();
+
+const ogImageUrl = (() => {
+	if (isAbsoluteUrl(ogImage)) return ogImage;
+	const resolved = withBase(ogImage);
+	return Astro.site ? new URL(resolved, Astro.site).toString() : new URL(resolved, Astro.url).toString();
+})();
+
+const businessSchema = {
+	'@context': 'https://schema.org',
+	'@type': 'GroceryStore',
+	name: company.name,
+	description,
+	url: canonicalUrl,
+	telephone: company.phone,
+	email: company.email,
+	image: ogImageUrl,
+	address: {
+		'@type': 'PostalAddress',
+		streetAddress: company.streetAddress,
+		addressLocality: company.city,
+		addressRegion: company.state,
+		postalCode: company.zipCode,
+		addressCountry: 'BR',
+	},
+	areaServed: company.serviceArea,
+	openingHours: ['Mo-Sa 07:00-21:00', 'Su 08:00-13:00'],
+	sameAs: [company.instagramUrl, company.facebookUrl],
+};
+---
+
+<!doctype html>
+<html lang="pt-BR">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="generator" content={Astro.generator} />
+		<script is:inline>
+			(() => {
+				try {
+					const root = document.documentElement;
+					const savedTheme = localStorage.getItem('market-theme');
+					const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+					const theme = savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : prefersDark ? 'dark' : 'light';
+					root.dataset.theme = theme;
+					root.style.colorScheme = theme;
+				} catch {
+					document.documentElement.dataset.theme = 'light';
+				}
+			})();
+		</script>
+		<title>{title}</title>
+		<meta name="description" content={description} />
+		<meta name="keywords" content={keywords} />
+		<meta name="author" content={company.name} />
+		<meta name="theme-color" content="#3a972f" data-theme-color />
+		<link rel="canonical" href={canonicalUrl} />
+		<link rel="icon" type="image/svg+xml" href={withBase('favicon.svg')} />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+		<link
+			rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap"
+		/>
+
+		<meta property="og:locale" content="pt_BR" />
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:url" content={canonicalUrl} />
+		<meta property="og:image" content={ogImageUrl} />
+		<meta property="og:site_name" content={company.name} />
+
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+		<meta name="twitter:image" content={ogImageUrl} />
+
+		<script type="application/ld+json" set:html={JSON.stringify(businessSchema)}></script>
+	</head>
+	<body>
+		<slot />
+	</body>
+</html>

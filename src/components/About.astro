@@ -1,0 +1,29 @@
+---
+import { aboutMetrics } from '../data/site';
+import SectionTitle from './SectionTitle.astro';
+---
+
+<section class="section section--soft" id="sobre">
+	<div class="container about">
+		<div class="about__copy">
+			<SectionTitle
+				eyebrow="Sobre o mercado"
+				title="Um mercado do bairro com jeito simples de comprar"
+				description="No Nome da sua empresa voce encontra variedade, bom preco e atendimento rapido."
+			/>
+			<p>
+				A ideia do site e facilitar sua compra no celular. Voce encontra os setores mais rapido,
+				monta a lista e envia para a loja pelo WhatsApp em poucos toques.
+			</p>
+		</div>
+
+		<div class="about__metrics">
+			{aboutMetrics.map((metric) => (
+				<article class="metric-card">
+					<strong>{metric.value}</strong>
+					<p>{metric.label}</p>
+				</article>
+			))}
+		</div>
+	</div>
+</section>
