@@ -26,7 +26,7 @@ import {
   getUpcomingAppointments,
 } from '../../lib/scheduling'
 import type { SalonActions } from '../../hooks/useSalonStore'
-import type { SalonState, ServiceCategory, WeeklyScheduleDay } from '../../types/domain'
+import type { BookingDraft, SalonState, ServiceCategory, WeeklyScheduleDay } from '../../types/domain'
 
 interface AdminDashboardProps {
   state: SalonState
@@ -73,6 +73,18 @@ const emptyServiceForm = {
   active: true,
 }
 
+function createManualDraft(): BookingDraft {
+  return {
+    serviceId: '',
+    date: todayIso(),
+    startTime: '',
+    name: '',
+    phone: '',
+    email: '',
+    notes: '',
+  }
+}
+
 export function AdminDashboard({
   state,
   actions,
@@ -93,6 +105,7 @@ export function AdminDashboard({
     allDay: false,
     reason: '',
   })
+  const [manualDraft, setManualDraft] = useState<BookingDraft>(createManualDraft)
   const [rescheduleDraft, setRescheduleDraft] = useState<{
     appointmentId: string
     date: string
@@ -102,6 +115,7 @@ export function AdminDashboard({
     tone: 'idle' as 'idle' | 'success' | 'error',
     message: '',
   })
+  const [isBusy, setIsBusy] = useState(false)
 
   const today = todayIso()
   const readyNotifications = state.notifications.filter(
@@ -135,6 +149,11 @@ export function AdminDashboard({
     return haystack.includes(deferredQuery.toLowerCase())
   })
 
+  const manualSlots =
+    manualDraft.serviceId && manualDraft.date
+      ? getAvailableSlots(manualDraft.serviceId, manualDraft.date)
+      : []
+
   const activeRescheduleSlots =
     rescheduleDraft &&
     getAvailableSlots(
@@ -163,8 +182,9 @@ export function AdminDashboard({
     setServiceForm(emptyServiceForm)
   }
 
-  function handleServiceSubmit() {
-    const result = actions.upsertService({
+  async function handleServiceSubmit() {
+    setIsBusy(true)
+    const result = await actions.upsertService({
       id: serviceForm.id || undefined,
       name: serviceForm.name,
       category: serviceForm.category,
@@ -175,6 +195,7 @@ export function AdminDashboard({
       accent: serviceForm.accent,
       active: serviceForm.active,
     })
+    setIsBusy(false)
 
     if (!result.ok) {
       setError(result.error ?? 'Não foi possível salvar o serviço.')
@@ -187,13 +208,23 @@ export function AdminDashboard({
     resetServiceForm()
   }
 
-  function handleScheduleSave() {
-    actions.updateWeeklySchedule(scheduleDraft)
-    setSuccess('Funcionamento semanal atualizado.')
+  async function handleScheduleSave() {
+    setIsBusy(true)
+    const result = await actions.updateWeeklySchedule(scheduleDraft)
+    setIsBusy(false)
+
+    if (!result.ok) {
+      setError(result.error ?? 'Não foi possível salvar o funcionamento.')
+      return
+    }
+
+    setSuccess('Funcionamento semanal atualizado no Firebase.')
   }
 
-  function handleBlockSubmit() {
-    const result = actions.addBlockedPeriod(blockForm)
+  async function handleBlockSubmit() {
+    setIsBusy(true)
+    const result = await actions.addBlockedPeriod(blockForm)
+    setIsBusy(false)
 
     if (!result.ok) {
       setError(result.error ?? 'Não foi possível salvar o bloqueio.')
@@ -210,17 +241,19 @@ export function AdminDashboard({
     })
   }
 
-  function handleRescheduleSubmit() {
+  async function handleRescheduleSubmit() {
     if (!rescheduleDraft?.startTime) {
       setError('Escolha um novo horário para concluir a remarcação.')
       return
     }
 
-    const result = actions.rescheduleAppointment(
+    setIsBusy(true)
+    const result = await actions.rescheduleAppointment(
       rescheduleDraft.appointmentId,
       rescheduleDraft.date,
       rescheduleDraft.startTime,
     )
+    setIsBusy(false)
 
     if (!result.ok) {
       setError(result.error ?? 'Não foi possível remarcar esse agendamento.')
@@ -229,6 +262,34 @@ export function AdminDashboard({
 
     setSuccess('Agendamento remarcado com sucesso.')
     setRescheduleDraft(null)
+  }
+
+  async function handleManualAppointmentSubmit() {
+    if (
+      !manualDraft.serviceId ||
+      !manualDraft.date ||
+      !manualDraft.startTime ||
+      !manualDraft.name.trim() ||
+      !manualDraft.phone.trim()
+    ) {
+      setError('Preencha serviço, data, horário, nome e telefone da cliente.')
+      return
+    }
+
+    setIsBusy(true)
+    const result = await actions.createManualAppointment({
+      ...manualDraft,
+      phone: manualDraft.phone.replace(/\D/g, ''),
+    })
+    setIsBusy(false)
+
+    if (!result.ok) {
+      setError(result.error ?? 'Não foi possível criar o horário manual.')
+      return
+    }
+
+    setSuccess('Horário manual da cliente registrado com sucesso.')
+    setManualDraft(createManualDraft())
   }
 
   async function copyMessage(message: string) {
@@ -332,15 +393,15 @@ export function AdminDashboard({
           <article className="panel-card wide">
             <div className="panel-head">
               <div>
-                <h2>Regras prontas para operação</h2>
-                <p>Como o sistema está estruturado hoje.</p>
+                <h2>Regras ativas no banco</h2>
+                <p>Como o sistema está operando agora com Firebase.</p>
               </div>
             </div>
             <ul className="bullet-list">
-              <li>Não permite sobreposição de horários para serviços ativos.</li>
-              <li>Respeita duração do serviço para bloquear todo o intervalo.</li>
-              <li>Suporta bloqueios pontuais e dias completos indisponíveis.</li>
-              <li>Gera confirmação, lembrete e alerta interno para a Alyssa.</li>
+              <li>Serviços, horários, bloqueios e agenda são lidos do Firestore.</li>
+              <li>O painel da Alyssa abre só após autenticação com senha.</li>
+              <li>Agendamentos criam bloqueios de slots no banco para evitar conflito.</li>
+              <li>Confirmações e lembretes ficam registrados na coleção de notificações.</li>
             </ul>
           </article>
         </div>
@@ -351,7 +412,144 @@ export function AdminDashboard({
           <div className="panel-head">
             <div>
               <h2>Agenda do dia</h2>
-              <p>Confirme, cancele ou remarque atendimentos sem perder contexto.</p>
+              <p>Confirme, cancele, remarque ou cadastre um horário manual da cliente.</p>
+            </div>
+          </div>
+
+          <div className="summary-card">
+            <h3>Novo horário manual</h3>
+            <div className="form-grid">
+              <label className="input-shell">
+                <span>Serviço</span>
+                <select
+                  value={manualDraft.serviceId}
+                  onChange={(event) =>
+                    setManualDraft((current) => ({
+                      ...current,
+                      serviceId: event.target.value,
+                      startTime: '',
+                    }))
+                  }
+                >
+                  <option value="">Selecione</option>
+                  {state.services
+                    .filter((service) => service.active)
+                    .map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+
+              <label className="input-shell">
+                <span>Data</span>
+                <input
+                  type="date"
+                  value={manualDraft.date}
+                  onChange={(event) =>
+                    setManualDraft((current) => ({
+                      ...current,
+                      date: event.target.value,
+                      startTime: '',
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="input-shell">
+                <span>Nome da cliente</span>
+                <input
+                  type="text"
+                  value={manualDraft.name}
+                  onChange={(event) =>
+                    setManualDraft((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="input-shell">
+                <span>WhatsApp</span>
+                <input
+                  type="tel"
+                  value={formatPhoneDisplay(manualDraft.phone)}
+                  onChange={(event) =>
+                    setManualDraft((current) => ({
+                      ...current,
+                      phone: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="input-shell">
+                <span>E-mail</span>
+                <input
+                  type="email"
+                  value={manualDraft.email}
+                  onChange={(event) =>
+                    setManualDraft((current) => ({
+                      ...current,
+                      email: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="input-shell full">
+                <span>Observações</span>
+                <textarea
+                  rows={3}
+                  value={manualDraft.notes}
+                  onChange={(event) =>
+                    setManualDraft((current) => ({
+                      ...current,
+                      notes: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+            </div>
+
+            {manualSlots.length ? (
+              <div className="slot-grid compact">
+                {manualSlots.map((slot) => (
+                  <button
+                    key={slot.startTime}
+                    type="button"
+                    className={`slot-button ${
+                      manualDraft.startTime === slot.startTime ? 'selected' : ''
+                    }`}
+                    onClick={() =>
+                      setManualDraft((current) => ({
+                        ...current,
+                        startTime: slot.startTime,
+                      }))
+                    }
+                  >
+                    <strong>{slot.startTime}</strong>
+                    <span>{slot.endTime}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-state compact">
+                Nenhum horário livre para o serviço e data escolhidos.
+              </div>
+            )}
+
+            <div className="actions-row wrap">
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => void handleManualAppointmentSubmit()}
+                disabled={isBusy}
+              >
+                {isBusy ? 'Salvando...' : 'Salvar horário da cliente'}
+              </button>
             </div>
           </div>
 
@@ -410,11 +608,13 @@ export function AdminDashboard({
                       <button
                         type="button"
                         className="ghost-button"
-                        onClick={() => {
-                          const result = actions.updateAppointmentStatus(
+                        onClick={async () => {
+                          setIsBusy(true)
+                          const result = await actions.updateAppointmentStatus(
                             appointment.id,
                             'confirmed',
                           )
+                          setIsBusy(false)
 
                           if (!result.ok) {
                             setError(result.error ?? 'Não foi possível confirmar.')
@@ -442,11 +642,13 @@ export function AdminDashboard({
                       <button
                         type="button"
                         className="ghost-button danger"
-                        onClick={() => {
-                          const result = actions.updateAppointmentStatus(
+                        onClick={async () => {
+                          setIsBusy(true)
+                          const result = await actions.updateAppointmentStatus(
                             appointment.id,
                             'cancelled',
                           )
+                          setIsBusy(false)
 
                           if (!result.ok) {
                             setError(result.error ?? 'Não foi possível cancelar.')
@@ -514,9 +716,10 @@ export function AdminDashboard({
                           <button
                             type="button"
                             className="primary-button"
-                            onClick={handleRescheduleSubmit}
+                            onClick={() => void handleRescheduleSubmit()}
+                            disabled={isBusy}
                           >
-                            Salvar nova data
+                            {isBusy ? 'Salvando...' : 'Salvar nova data'}
                           </button>
                           <button
                             type="button"
@@ -632,8 +835,17 @@ export function AdminDashboard({
           </div>
 
           <div className="actions-row wrap">
-            <button type="button" className="primary-button" onClick={handleServiceSubmit}>
-              {serviceForm.id ? 'Atualizar serviço' : 'Cadastrar serviço'}
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => void handleServiceSubmit()}
+              disabled={isBusy}
+            >
+              {isBusy
+                ? 'Salvando...'
+                : serviceForm.id
+                  ? 'Atualizar serviço'
+                  : 'Cadastrar serviço'}
             </button>
             <button type="button" className="ghost-button" onClick={resetServiceForm}>
               Limpar formulário
@@ -675,7 +887,18 @@ export function AdminDashboard({
                   <button
                     type="button"
                     className="ghost-button"
-                    onClick={() => actions.toggleServiceActive(service.id)}
+                    onClick={async () => {
+                      setIsBusy(true)
+                      const result = await actions.toggleServiceActive(service.id)
+                      setIsBusy(false)
+
+                      if (!result.ok) {
+                        setError(result.error ?? 'Não foi possível atualizar o serviço.')
+                        return
+                      }
+
+                      setSuccess('Visibilidade do serviço atualizada.')
+                    }}
                   >
                     {service.active ? 'Ocultar' : 'Reativar'}
                   </button>
@@ -800,8 +1023,13 @@ export function AdminDashboard({
           </div>
 
           <div className="actions-row">
-            <button type="button" className="primary-button" onClick={handleScheduleSave}>
-              Salvar funcionamento
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => void handleScheduleSave()}
+              disabled={isBusy}
+            >
+              {isBusy ? 'Salvando...' : 'Salvar funcionamento'}
             </button>
           </div>
         </div>
@@ -891,8 +1119,13 @@ export function AdminDashboard({
           </div>
 
           <div className="actions-row">
-            <button type="button" className="primary-button" onClick={handleBlockSubmit}>
-              Adicionar bloqueio
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => void handleBlockSubmit()}
+              disabled={isBusy}
+            >
+              {isBusy ? 'Salvando...' : 'Adicionar bloqueio'}
             </button>
           </div>
 
@@ -909,7 +1142,18 @@ export function AdminDashboard({
                 <button
                   type="button"
                   className="ghost-button danger"
-                  onClick={() => actions.removeBlockedPeriod(block.id)}
+                  onClick={async () => {
+                    setIsBusy(true)
+                    const result = await actions.removeBlockedPeriod(block.id)
+                    setIsBusy(false)
+
+                    if (!result.ok) {
+                      setError(result.error ?? 'Não foi possível remover o bloqueio.')
+                      return
+                    }
+
+                    setSuccess('Bloqueio removido.')
+                  }}
                 >
                   Remover
                 </button>
@@ -984,7 +1228,7 @@ export function AdminDashboard({
                     <button
                       type="button"
                       className="ghost-button"
-                      onClick={() => copyMessage(notification.message)}
+                      onClick={() => void copyMessage(notification.message)}
                     >
                       <Copy size={16} />
                       Copiar
@@ -1006,7 +1250,20 @@ export function AdminDashboard({
                       <button
                         type="button"
                         className="primary-button"
-                        onClick={() => actions.markNotificationSent(notification.id)}
+                        onClick={async () => {
+                          setIsBusy(true)
+                          const result = await actions.markNotificationSent(
+                            notification.id,
+                          )
+                          setIsBusy(false)
+
+                          if (!result.ok) {
+                            setError(result.error ?? 'Não foi possível atualizar.')
+                            return
+                          }
+
+                          setSuccess('Notificação marcada como enviada.')
+                        }}
                       >
                         Marcar como enviada
                       </button>

@@ -1,0 +1,63 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null;
+    }
+
+    match /salon/config {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /blockedPeriods/{blockId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /slotLocks/{lockId} {
+      allow read: if true;
+      allow create: if request.resource.data.id == lockId
+        && request.resource.data.date is string
+        && request.resource.data.time is string
+        && request.resource.data.appointmentId is string
+        && request.resource.data.createdAt is string;
+      allow update, delete: if isAdmin();
+    }
+
+    match /appointments/{appointmentId} {
+      allow create: if request.resource.data.id == appointmentId
+        && request.resource.data.serviceId is string
+        && request.resource.data.date is string
+        && request.resource.data.startTime is string
+        && request.resource.data.endTime is string
+        && request.resource.data.status is string
+        && request.resource.data.origin is string
+        && request.resource.data.client.name is string
+        && request.resource.data.client.phone is string
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string;
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow create: if request.resource.data.id == notificationId
+        && request.resource.data.appointmentId is string
+        && request.resource.data.channel is string
+        && request.resource.data.kind is string
+        && request.resource.data.recipient is string
+        && request.resource.data.title is string
+        && request.resource.data.message is string
+        && request.resource.data.scheduledFor is string
+        && request.resource.data.status is string
+        && request.resource.data.createdAt is string;
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}

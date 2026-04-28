@@ -37,6 +37,24 @@ export function getServiceById(state: SalonState, serviceId: string) {
   return state.services.find((service) => service.id === serviceId)
 }
 
+export function buildSlotTimes(
+  startTime: string,
+  durationMinutes: number,
+  slotIntervalMinutes: number,
+) {
+  const times: string[] = []
+  const startMinutes = timeToMinutes(startTime)
+  const endMinutes = startMinutes + durationMinutes
+
+  for (let cursor = startMinutes; cursor < endMinutes; cursor += slotIntervalMinutes) {
+    times.push(
+      `${String(Math.floor(cursor / 60)).padStart(2, '0')}:${String(cursor % 60).padStart(2, '0')}`,
+    )
+  }
+
+  return times
+}
+
 function getScheduleMinutes(periods: TimeRange[]) {
   return periods.reduce(
     (total, period) => total + Math.max(0, timeToMinutes(period.end) - timeToMinutes(period.start)),
@@ -76,6 +94,14 @@ export function getAvailableSlots(
       appointment.id !== ignoreAppointmentId &&
       isBlockingStatus(appointment.status),
   )
+  const daySlotLockSet = new Set(
+    state.slotLocks
+      .filter(
+        (slotLock) =>
+          slotLock.date === date && slotLock.appointmentId !== ignoreAppointmentId,
+      )
+      .map((slotLock) => slotLock.time),
+  )
 
   const slots: SlotOption[] = []
 
@@ -92,6 +118,12 @@ export function getAvailableSlots(
         rangesOverlap(startTime, endTime, block.start, block.end),
       )
 
+      const blockedBySlotLock = buildSlotTimes(
+        startTime,
+        service.durationMinutes,
+        state.settings.slotIntervalMinutes,
+      ).some((time) => daySlotLockSet.has(time))
+
       const blockedByAppointment = dayAppointments.some((appointment) =>
         rangesOverlap(
           startTime,
@@ -101,7 +133,7 @@ export function getAvailableSlots(
         ),
       )
 
-      if (!blockedByPeriod && !blockedByAppointment) {
+      if (!blockedByPeriod && !blockedBySlotLock && !blockedByAppointment) {
         slots.push({
           startTime,
           endTime,
@@ -157,21 +189,22 @@ export function calculateDayOccupancy(state: SalonState, date: string) {
 
   const scheduleMinutes = getScheduleMinutes(daySchedule.periods)
   const reservedMinutes = state.appointments
-    .filter(
-      (appointment) =>
-        appointment.date === date && isBlockingStatus(appointment.status),
-    )
-    .reduce(
-      (total, appointment) =>
-        total + (timeToMinutes(appointment.endTime) - timeToMinutes(appointment.startTime)),
-      0,
-    )
+    .filter((appointment) => appointment.date === date && isBlockingStatus(appointment.status))
+    .reduce((total, appointment) => {
+      return total + (timeToMinutes(appointment.endTime) - timeToMinutes(appointment.startTime))
+    }, 0)
+
+  const slotLockReservedMinutes = state.slotLocks.filter(
+    (slotLock) => slotLock.date === date,
+  ).length * state.settings.slotIntervalMinutes
 
   if (!scheduleMinutes) {
     return 0
   }
 
-  return Math.min(100, Math.round((reservedMinutes / scheduleMinutes) * 100))
+  const effectiveReservedMinutes = reservedMinutes || slotLockReservedMinutes
+
+  return Math.min(100, Math.round((effectiveReservedMinutes / scheduleMinutes) * 100))
 }
 
 export function calculateProjectedRevenue(state: SalonState, fromDate?: string) {

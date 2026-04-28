@@ -54,8 +54,29 @@ npm run build
 
 O projeto já inclui o workflow `.github/workflows/deploy.yml`. Ao subir a branch `main`, o GitHub Actions faz o build e publica em GitHub Pages.
 
-## Observação importante
+## Firebase
 
-Para permitir deploy estático imediato no GitHub Pages, a persistência atual usa `localStorage` com uma camada de store organizada. Isso deixa a UX e as regras de agenda prontas, mas não sincroniza agendamentos entre dispositivos diferentes.
+O projeto agora usa:
 
-Se a Alyssa for usar em produção com clientes reais acessando de celulares diferentes, o próximo passo é trocar apenas a camada de persistência por um backend compartilhado, como Supabase, Firebase ou API própria, reaproveitando a interface e as regras já implementadas.
+- `Firebase Auth` para proteger o painel da Alyssa com e-mail e senha
+- `Cloud Firestore` para serviços, agenda, bloqueios, horários ocupados, clientes e notificações
+
+### Configuração necessária
+
+1. No Firebase Console, ative `Authentication > Sign-in method > Email/Password`.
+2. Crie a usuária da Alyssa em `Authentication > Users`.
+3. Crie o banco em `Firestore Database`.
+4. Publique as regras de [firestore.rules](/C:/xampp/77/Projetos/AlyssaUnhas/firestore.rules).
+
+### Estrutura principal no Firestore
+
+- `salon/config`
+- `services/{serviceId}`
+- `blockedPeriods/{blockId}`
+- `slotLocks/{date_time}`
+- `appointments/{appointmentId}`
+- `notifications/{notificationId}`
+
+### Observação de segurança
+
+As regras incluídas já separam leitura pública do catálogo e da disponibilidade da leitura administrativa da agenda completa. Para um cenário de produção mais rígido, o ideal é mover a criação de agendamentos para Cloud Functions e validar conflito de horários também no backend.

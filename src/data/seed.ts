@@ -1,10 +1,12 @@
 import { addDays } from 'date-fns'
 import { buildCreatedNotifications } from '../lib/notifications'
 import { addMinutesToTime, toDateInputValue } from '../lib/dateTime'
+import { buildSlotTimes } from '../lib/scheduling'
 import type {
   AppointmentItem,
   SalonState,
   ServiceItem,
+  SlotLockItem,
   WeeklyScheduleDay,
 } from '../types/domain'
 
@@ -222,6 +224,26 @@ export function createSeedState(): SalonState {
     ],
   }
 
+  const slotLocks: SlotLockItem[] = appointments.flatMap((appointment) => {
+    const service = services.find((item) => item.id === appointment.serviceId)
+
+    if (!service) {
+      return []
+    }
+
+    return buildSlotTimes(
+      appointment.startTime,
+      service.durationMinutes,
+      settings.slotIntervalMinutes,
+    ).map((time) => ({
+      id: `${appointment.date}_${time}`,
+      appointmentId: appointment.id,
+      date: appointment.date,
+      time,
+      createdAt: appointment.createdAt,
+    }))
+  })
+
   return {
     services,
     weeklySchedule: createWeeklySchedule(),
@@ -243,6 +265,7 @@ export function createSeedState(): SalonState {
         reason: 'Dia de descanso',
       },
     ],
+    slotLocks,
     appointments,
     notifications: appointments.flatMap((appointment) => {
       const service = services.find((item) => item.id === appointment.serviceId)!

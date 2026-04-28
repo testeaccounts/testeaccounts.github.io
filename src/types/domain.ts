@@ -75,6 +75,14 @@ export interface AppointmentItem {
   updatedAt: string
 }
 
+export interface SlotLockItem {
+  id: string
+  appointmentId: string
+  date: string
+  time: string
+  createdAt: string
+}
+
 export interface NotificationItem {
   id: string
   appointmentId: string
@@ -105,6 +113,7 @@ export interface SalonState {
   services: ServiceItem[]
   weeklySchedule: WeeklyScheduleDay[]
   blockedPeriods: AvailabilityBlock[]
+  slotLocks: SlotLockItem[]
   appointments: AppointmentItem[]
   notifications: NotificationItem[]
   settings: SalonSettings
@@ -133,4 +142,9 @@ export interface ActionResult<T = undefined> {
   ok: boolean
   error?: string
   data?: T
+}
+
+export interface AdminCredentials {
+  email: string
+  password: string
 }

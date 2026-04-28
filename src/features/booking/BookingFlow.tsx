@@ -101,7 +101,7 @@ export function BookingFlow({
     })
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const nextErrors = validateBookingForm(formValues)
     setFieldErrors(nextErrors)
 
@@ -128,38 +128,36 @@ export function BookingFlow({
       message: '',
     })
 
-    window.setTimeout(() => {
-      const result = actions.createAppointment({
-        serviceId: selectedServiceId,
-        date: effectiveDate,
-        startTime: effectiveTime,
-        name: formValues.name.trim(),
-        phone: formValues.phone.replace(/\D/g, ''),
-        email: formValues.email.trim(),
-        notes: formValues.notes.trim(),
-      })
+    const result = await actions.createAppointment({
+      serviceId: selectedServiceId,
+      date: effectiveDate,
+      startTime: effectiveTime,
+      name: formValues.name.trim(),
+      phone: formValues.phone.replace(/\D/g, ''),
+      email: formValues.email.trim(),
+      notes: formValues.notes.trim(),
+    })
 
-      setIsSubmitting(false)
+    setIsSubmitting(false)
 
-      if (!result.ok || !result.data) {
-        setFeedback({
-          type: 'error',
-          message:
-            result.error ??
-            'Não foi possível concluir o agendamento. Tente novamente.',
-        })
-        return
-      }
-
-      setConfirmationId(result.data.id)
+    if (!result.ok || !result.data) {
       setFeedback({
-        type: 'success',
+        type: 'error',
         message:
-          'Horário confirmado com sucesso. A confirmação e o lembrete já ficaram preparados na central de notificações.',
+          result.error ??
+          'Não foi possível concluir o agendamento. Tente novamente.',
       })
-      setFormValues(initialForm)
-      setFieldErrors({})
-    }, 520)
+      return
+    }
+
+    setConfirmationId(result.data.id)
+    setFeedback({
+      type: 'success',
+      message:
+        'Horário confirmado com sucesso. Os dados foram gravados no Firebase e o lembrete ficou preparado na central de notificações.',
+    })
+    setFormValues(initialForm)
+    setFieldErrors({})
   }
 
   return (
@@ -437,7 +435,7 @@ export function BookingFlow({
           <button
             type="button"
             className="primary-button"
-            onClick={handleSubmit}
+            onClick={() => void handleSubmit()}
             disabled={isSubmitting}
           >
             {isSubmitting ? 'Confirmando horário...' : 'Confirmar agendamento'}

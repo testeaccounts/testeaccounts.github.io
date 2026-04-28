@@ -1,7 +1,7 @@
 import { BellRing, CalendarClock, Sparkles } from 'lucide-react'
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
+import { AdminAccess } from './features/admin/AdminAccess'
 import { BookingFlow } from './features/booking/BookingFlow'
-import { AdminDashboard } from './features/admin/AdminDashboard'
 import { useSalonStore } from './hooks/useSalonStore'
 import { formatLongDate, todayIso } from './lib/dateTime'
 import { formatCurrencyBRL } from './lib/format'
@@ -12,7 +12,17 @@ import {
 } from './lib/scheduling'
 
 function App() {
-  const { state, actions, getAvailableSlots } = useSalonStore()
+  const {
+    state,
+    actions,
+    getAvailableSlots,
+    loading,
+    authReady,
+    adminUser,
+    syncError,
+    loginAdmin,
+    logoutAdmin,
+  } = useSalonStore()
   const upcomingAppointments = getUpcomingAppointments(state, 1)
   const nextAppointment = upcomingAppointments[0]
   const nextAppointmentService = nextAppointment
@@ -142,9 +152,15 @@ function App() {
               <Route
                 path="/admin"
                 element={
-                  <AdminDashboard
+                  <AdminAccess
                     state={state}
                     actions={actions}
+                    loading={loading}
+                    authReady={authReady}
+                    adminUser={adminUser}
+                    syncError={syncError}
+                    loginAdmin={loginAdmin}
+                    logoutAdmin={logoutAdmin}
                     getAvailableSlots={getAvailableSlots}
                   />
                 }
