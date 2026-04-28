@@ -380,7 +380,7 @@ export function useSalonStore() {
   }, [adminUser])
 
   useEffect(() => {
-    if (loading || bootstrapAttemptedRef.current) {
+    if (loading || bootstrapAttemptedRef.current || !adminUser) {
       return
     }
 
@@ -393,9 +393,16 @@ export function useSalonStore() {
 
     bootstrapAttemptedRef.current = true
     void bootstrapRemoteState().catch((error: Error) => {
+      bootstrapAttemptedRef.current = false
       setSyncError(error.message)
     })
-  }, [loading, state.blockedPeriods.length, state.services.length, state.weeklySchedule.length])
+  }, [
+    adminUser,
+    loading,
+    state.blockedPeriods.length,
+    state.services.length,
+    state.weeklySchedule.length,
+  ])
 
   async function requireAdmin() {
     if (!firebaseAuth.currentUser) {
