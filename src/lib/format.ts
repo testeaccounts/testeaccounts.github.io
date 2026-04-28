@@ -9,6 +9,10 @@ export function formatCurrencyBRL(value: number) {
   }).format(value)
 }
 
+export function formatServicePrice(value: number) {
+  return value > 0 ? formatCurrencyBRL(value) : 'Sob consulta'
+}
+
 export function formatDuration(minutes: number) {
   if (minutes < 60) {
     return `${minutes} min`
@@ -63,6 +67,10 @@ export function ensureWhatsappNumber(phone: string) {
 
 export function createWhatsAppLink(phone: string, message: string) {
   const recipient = ensureWhatsappNumber(phone)
+
+  if (!recipient) {
+    return ''
+  }
 
   return `https://wa.me/${recipient}?text=${encodeURIComponent(message)}`
 }

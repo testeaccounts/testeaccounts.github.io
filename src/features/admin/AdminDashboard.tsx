@@ -14,13 +14,12 @@ import {
 import { buildUpcomingDates, formatLongDate, formatTimestamp, todayIso } from '../../lib/dateTime'
 import {
   createWhatsAppLink,
-  formatCurrencyBRL,
   formatDuration,
   formatPhoneDisplay,
+  formatServicePrice,
 } from '../../lib/format'
 import {
   calculateDayOccupancy,
-  calculateProjectedRevenue,
   getServiceById,
   getUniqueClients,
   getUpcomingAppointments,
@@ -66,8 +65,8 @@ const emptyServiceForm = {
   name: '',
   category: 'manicure' as ServiceCategory,
   description: '',
-  durationMinutes: '75',
-  price: '68',
+  durationMinutes: '60',
+  price: '0',
   featured: true,
   accent: 'rose',
   active: true,
@@ -123,9 +122,9 @@ export function AdminDashboard({
   )
   const upcomingAppointments = getUpcomingAppointments(state, 5)
   const occupancyToday = calculateDayOccupancy(state, today)
-  const projectedRevenue = calculateProjectedRevenue(state, today)
   const clients = getUniqueClients(state)
   const datesWindow = buildUpcomingDates(state.settings.bookingWindowDays)
+  const activeServices = state.services.filter((service) => service.active)
 
   const filteredAppointments = state.appointments.filter((appointment) => {
     if (appointment.date !== agendaDate) {
@@ -305,10 +304,10 @@ export function AdminDashboard({
     <div className="admin-layout">
       <section className="page-intro">
         <span className="eyebrow">Painel da Alyssa</span>
-        <h1>Gestão clara da agenda, serviços e notificações</h1>
+        <h1>Agenda, horários e clientes organizados em um só lugar</h1>
         <p>
-          Tudo o que a Alyssa precisa para evitar conflito de horários e responder
-          clientes com mais rapidez.
+          Painel pensado para esmaltação tradicional, horários sem conflito e um
+          atendimento mais leve no dia a dia.
         </p>
       </section>
 
@@ -345,9 +344,9 @@ export function AdminDashboard({
             <p>Baseado nos horários já reservados e no funcionamento do dia.</p>
           </article>
           <article className="metric-card">
-            <span>Receita projetada</span>
-            <strong>{formatCurrencyBRL(projectedRevenue)}</strong>
-            <p>Somatório dos atendimentos ativos a partir de hoje.</p>
+            <span>Serviços ativos</span>
+            <strong>{activeServices.length}</strong>
+            <p>Catálogo visível para o agendamento das clientes.</p>
           </article>
           <article className="metric-card">
             <span>Clientes cadastradas</span>
@@ -394,7 +393,7 @@ export function AdminDashboard({
             <div className="panel-head">
               <div>
                 <h2>Regras ativas no banco</h2>
-                <p>Como o sistema está operando agora com Firebase.</p>
+                <p>Como o sistema está operando agora com Firebase e hora marcada.</p>
               </div>
             </div>
             <ul className="bullet-list">
@@ -402,6 +401,7 @@ export function AdminDashboard({
               <li>O painel da Alyssa abre só após autenticação com senha.</li>
               <li>Agendamentos criam bloqueios de slots no banco para evitar conflito.</li>
               <li>Confirmações e lembretes ficam registrados na coleção de notificações.</li>
+              <li>O catálogo padrão desta versão é focado em pé, mão e pé e mão tradicional.</li>
             </ul>
           </article>
         </div>
@@ -409,12 +409,12 @@ export function AdminDashboard({
 
       {activeTab === 'agenda' ? (
         <div className="panel-card">
-          <div className="panel-head">
-            <div>
-              <h2>Agenda do dia</h2>
-              <p>Confirme, cancele, remarque ou cadastre um horário manual da cliente.</p>
+            <div className="panel-head">
+              <div>
+                <h2>Agenda do dia</h2>
+                <p>Confirme, cancele, remarque ou cadastre um horário manual da cliente.</p>
+              </div>
             </div>
-          </div>
 
           <div className="summary-card">
             <h3>Novo horário manual</h3>
@@ -589,7 +589,7 @@ export function AdminDashboard({
                         <strong>{appointment.client.name}</strong>
                         <p>
                           {appointment.startTime} • {service?.name ?? 'Serviço'} •{' '}
-                          {formatCurrencyBRL(service?.price ?? 0)}
+                          {formatServicePrice(service?.price ?? 0)}
                         </p>
                       </div>
                       <span className={`status-pill ${appointment.status}`}>
@@ -749,7 +749,7 @@ export function AdminDashboard({
           <div className="panel-head">
             <div>
               <h2>Serviços</h2>
-              <p>Cadastre preços, duração e destaque os serviços mais vendidos.</p>
+              <p>Cadastre apenas os serviços tradicionais da Alyssa e ajuste duração ou valor quando quiser.</p>
             </div>
           </div>
 
@@ -780,8 +780,6 @@ export function AdminDashboard({
                 }
               >
                 <option value="manicure">Manicure</option>
-                <option value="alongamento">Alongamento</option>
-                <option value="spa">Spa</option>
                 <option value="pedicure">Pedicure</option>
                 <option value="combo">Combo</option>
               </select>
@@ -809,6 +807,7 @@ export function AdminDashboard({
                 type="number"
                 min="0"
                 step="0.01"
+                placeholder="0 = Sob consulta"
                 value={serviceForm.price}
                 onChange={(event) =>
                   setServiceForm((current) => ({
@@ -850,6 +849,24 @@ export function AdminDashboard({
             <button type="button" className="ghost-button" onClick={resetServiceForm}>
               Limpar formulário
             </button>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={async () => {
+                setIsBusy(true)
+                const result = await actions.resetDemoData()
+                setIsBusy(false)
+
+                if (!result.ok) {
+                  setError(result.error ?? 'Não foi possível reaplicar a base padrão.')
+                  return
+                }
+
+                setSuccess('Base padrão da Alyssa reaplicada no Firebase.')
+              }}
+            >
+              Aplicar catálogo padrão
+            </button>
           </div>
 
           <div className="list-stack">
@@ -859,7 +876,7 @@ export function AdminDashboard({
                   <strong>{service.name}</strong>
                   <p>
                     {formatDuration(service.durationMinutes)} •{' '}
-                    {formatCurrencyBRL(service.price)} •{' '}
+                    {formatServicePrice(service.price)} •{' '}
                     {service.active ? 'visível para cliente' : 'oculto'}
                   </p>
                 </div>
@@ -1233,7 +1250,7 @@ export function AdminDashboard({
                       <Copy size={16} />
                       Copiar
                     </button>
-                    {notification.channel === 'whatsapp' ? (
+                    {notification.channel === 'whatsapp' && notification.recipient ? (
                       <a
                         className="ghost-button"
                         href={createWhatsAppLink(

@@ -9,7 +9,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { buildUpcomingDates, formatLongDate, formatShortDate } from '../../lib/dateTime'
-import { formatCurrencyBRL, formatDuration, formatPhoneDisplay } from '../../lib/format'
+import { formatDuration, formatPhoneDisplay, formatServicePrice } from '../../lib/format'
 import { getServiceById } from '../../lib/scheduling'
 import { validateBookingForm } from '../../lib/validators'
 import type { SalonActions } from '../../hooks/useSalonStore'
@@ -164,11 +164,26 @@ export function BookingFlow({
     <div className="booking-layout">
       <section className="page-intro">
         <span className="eyebrow">Autoatendimento</span>
-        <h1>Marque seu horário em poucos passos</h1>
+        <h1>Escolha o serviço e reserve seu horário</h1>
         <p>
-          Escolha o serviço, veja horários realmente livres e confirme o seu
-          atendimento sem depender de conversa manual.
+          Atendimento pensado para unhas naturais, esmaltação tradicional e um
+          agendamento simples de usar no celular.
         </p>
+      </section>
+
+      <section className="summary-card booking-note-card">
+        <div className="summary-row">
+          <span>Especialidade</span>
+          <strong>Unhas naturais</strong>
+        </div>
+        <div className="summary-row">
+          <span>Formato</span>
+          <strong>Atendimento somente com hora marcada</strong>
+        </div>
+        <div className="summary-row">
+          <span>Observação</span>
+          <strong>Não atendo a domicílio</strong>
+        </div>
       </section>
 
       <section className="step-card">
@@ -176,7 +191,7 @@ export function BookingFlow({
           <span className="step-index">1</span>
           <div>
             <h2>Escolha o serviço</h2>
-            <p>Veja duração, faixa de preço e o foco de cada atendimento.</p>
+            <p>Veja a duração do atendimento e selecione o que combina com você.</p>
           </div>
         </div>
 
@@ -195,7 +210,7 @@ export function BookingFlow({
               >
                 <div className="service-card-top">
                   <span className="service-pill">
-                    {service.featured ? 'Mais pedido' : 'Disponível'}
+                    {service.featured ? 'Tradicional' : 'Hora marcada'}
                   </span>
                   <ChevronRight size={18} />
                 </div>
@@ -206,7 +221,7 @@ export function BookingFlow({
                     <Clock3 size={16} />
                     {formatDuration(service.durationMinutes)}
                   </span>
-                  <strong>{formatCurrencyBRL(service.price)}</strong>
+                  <strong>{formatServicePrice(service.price)}</strong>
                 </div>
               </button>
             )
@@ -419,7 +434,7 @@ export function BookingFlow({
           <div className="summary-row">
             <span>Investimento</span>
             <strong>
-              {selectedService ? formatCurrencyBRL(selectedService.price) : '--'}
+              {selectedService ? formatServicePrice(selectedService.price) : '--'}
             </strong>
           </div>
         </div>
@@ -441,7 +456,7 @@ export function BookingFlow({
             {isSubmitting ? 'Confirmando horário...' : 'Confirmar agendamento'}
           </button>
           <Link className="ghost-button" to="/admin">
-            Abrir painel da Alyssa
+            Entrar no painel da Alyssa
           </Link>
         </div>
 

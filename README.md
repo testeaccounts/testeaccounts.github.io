@@ -4,6 +4,7 @@ Sistema de autoatendimento para manicure/unhas com duas experiências no mesmo p
 
 - fluxo da cliente para escolher serviço, data, horário e confirmar agendamento
 - painel administrativo para Alyssa gerenciar serviços, agenda, bloqueios, clientes e notificações
+- interface mobile-first focada em esmaltação tradicional e unhas naturais
 
 ## Stack
 
@@ -15,7 +16,8 @@ Sistema de autoatendimento para manicure/unhas com duas experiências no mesmo p
 
 ## Funcionalidades entregues
 
-- catálogo de serviços com duração e preço
+- catálogo padrão com `Pé e mão tradicional`, `Mão tradicional` e `Pé tradicional`
+- interface mobile-first com hero, diferenciais, mapa e carrossel de portfólio
 - disponibilidade baseada em funcionamento semanal, bloqueios e duração do serviço
 - prevenção de conflito de horários
 - formulário de agendamento com validação de nome, telefone e e-mail
@@ -67,6 +69,7 @@ O projeto agora usa:
 2. Crie a usuária da Alyssa em `Authentication > Users`.
 3. Crie o banco em `Firestore Database`.
 4. Publique as regras de [firestore.rules](/C:/xampp/77/Projetos/AlyssaUnhas/firestore.rules).
+5. Faça o primeiro login da Alyssa no painel para permitir que a base inicial seja sincronizada no Firestore.
 
 ### Estrutura principal no Firestore
 
@@ -80,3 +83,11 @@ O projeto agora usa:
 ### Observação de segurança
 
 As regras incluídas já separam leitura pública do catálogo e da disponibilidade da leitura administrativa da agenda completa. Para um cenário de produção mais rígido, o ideal é mover a criação de agendamentos para Cloud Functions e validar conflito de horários também no backend.
+
+## Catálogo padrão desta versão
+
+- `Pé e mão tradicional` com duração de `2h`
+- `Mão tradicional` com duração de `1h`
+- `Pé tradicional` com duração de `1h`
+
+Os preços podem ficar em `0` no painel enquanto não forem definidos. Nesse caso, o app mostra `Sob consulta`.

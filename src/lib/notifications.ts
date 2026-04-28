@@ -7,7 +7,7 @@ import type {
   ServiceItem,
 } from '../types/domain'
 import { combineDateTime, formatDateTimeLabel } from './dateTime'
-import { formatCurrencyBRL } from './format'
+import { formatServicePrice } from './format'
 
 function createId(prefix: string) {
   return `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`
@@ -113,7 +113,7 @@ export function buildCreatedNotifications(
       'whatsapp',
       appointment.client.phone,
       'Confirmação de horário',
-      `Oi, ${appointment.client.name}! Seu horário para ${service.name} foi confirmado para ${scheduledLabel}. Valor previsto: ${formatCurrencyBRL(service.price)}.`,
+      `Oi, ${appointment.client.name}! Seu horário para ${service.name} foi confirmado para ${scheduledLabel}. Valor previsto: ${formatServicePrice(service.price)}.`,
     ),
     buildNotification(
       appointment.id,

@@ -121,9 +121,9 @@ code {
 }
 
 .page-frame {
-  width: min(1240px, calc(100% - 1.25rem));
+  width: min(480px, calc(100% - 1rem));
   margin: 0 auto;
-  padding: 1rem 0 2rem;
+  padding: 0.75rem 0 1.5rem;
 }
 
 .topbar {
@@ -131,11 +131,14 @@ code {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1rem 1.1rem;
+  position: sticky;
+  top: 0.65rem;
+  z-index: 20;
+  padding: 0.95rem 1rem;
   margin-bottom: 1rem;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  background: rgba(255, 249, 244, 0.72);
+  border-radius: 28px;
+  background: rgba(255, 249, 244, 0.88);
   backdrop-filter: blur(18px);
   box-shadow: var(--shadow-md);
 }
@@ -200,7 +203,7 @@ code {
 .hero-panel {
   display: grid;
   gap: 1rem;
-  padding: 1.3rem;
+  padding: 1.15rem;
   border-radius: var(--radius-xl);
   border: 1px solid var(--border);
   background:
@@ -218,7 +221,7 @@ code {
 
 .hero-copy p,
 .page-intro p {
-  max-width: 60ch;
+  max-width: 100%;
   color: var(--muted);
   line-height: 1.65;
 }
@@ -309,20 +312,33 @@ code {
   margin-top: 1rem;
 }
 
+.support-grid {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
 .side-panel,
 .route-frame {
   padding: 1rem;
   border-radius: var(--radius-xl);
 }
 
+.compact-panel {
+  display: grid;
+  gap: 0.9rem;
+}
+
 .journey-list,
 .policy-list,
+.highlight-list,
 .bullet-list {
   padding-left: 1.2rem;
 }
 
 .journey-list,
-.policy-list {
+.policy-list,
+.highlight-list {
   display: grid;
   gap: 0.65rem;
   margin-top: 1rem;
@@ -335,6 +351,7 @@ code {
 }
 
 .route-frame {
+  margin-top: 1rem;
   overflow: hidden;
 }
 
@@ -682,6 +699,15 @@ code {
     background 160ms ease;
 }
 
+.full-width {
+  width: 100%;
+}
+
+.icon-only {
+  min-width: 48px;
+  padding-inline: 0;
+}
+
 .primary-button {
   background: linear-gradient(135deg, var(--accent), var(--accent-strong));
   color: #fff8f4;
@@ -806,26 +832,184 @@ code {
   line-height: 1.55;
 }
 
+.booking-note-card {
+  background: rgba(255, 251, 248, 0.84);
+}
+
+.map-card strong {
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.portfolio-section {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.portfolio-window {
+  position: relative;
+  min-height: 420px;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--shadow-md);
+}
+
+.portfolio-photo,
+.portfolio-fallback {
+  width: 100%;
+  height: 420px;
+  display: block;
+}
+
+.portfolio-photo {
+  object-fit: cover;
+}
+
+.portfolio-fallback {
+  position: relative;
+  display: grid;
+  align-content: end;
+  padding: 1.2rem;
+  color: #fff9f6;
+}
+
+.portfolio-fallback strong {
+  color: inherit;
+  font-size: 0.92rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.portfolio-fallback p {
+  max-width: 16ch;
+  font-family: var(--font-display);
+  font-size: 2.15rem;
+  line-height: 0.95;
+}
+
+.portfolio-fallback-mark {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(10px);
+  font-size: 0.82rem;
+}
+
+.slide-royal {
+  background:
+    radial-gradient(circle at top left, rgba(131, 171, 255, 0.48), transparent 38%),
+    linear-gradient(160deg, #2d52e6, #6d83f3 46%, #315996);
+}
+
+.slide-classic {
+  background:
+    radial-gradient(circle at top right, rgba(255, 209, 216, 0.35), transparent 34%),
+    linear-gradient(160deg, #c61339, #f03f52 48%, #8e0827);
+}
+
+.slide-porcelain {
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.58), transparent 40%),
+    linear-gradient(160deg, #f2ede8, #d8c9bd 42%, #b39b8d);
+  color: #3c2e30;
+}
+
+.slide-glow {
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.62), transparent 28%),
+    linear-gradient(160deg, #d8cfec, #f0ebfb 42%, #b4a8d9);
+  color: #3c3050;
+}
+
+.slide-midnight {
+  background:
+    radial-gradient(circle at top right, rgba(134, 177, 255, 0.28), transparent 32%),
+    linear-gradient(160deg, #0d2354, #163d87 44%, #09112f);
+}
+
+.slide-espresso {
+  background:
+    radial-gradient(circle at top left, rgba(255, 216, 181, 0.18), transparent 30%),
+    linear-gradient(160deg, #372621, #5e463d 46%, #1d1613);
+}
+
+.slide-portrait {
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.28), transparent 34%),
+    linear-gradient(160deg, #2a2a2a, #7b6c73 48%, #111111);
+}
+
+.portfolio-overlay {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem 1rem 1.1rem;
+  background:
+    linear-gradient(180deg, rgba(20, 14, 15, 0) 0%, rgba(20, 14, 15, 0.82) 64%);
+  color: #fff9f6;
+}
+
+.portfolio-overlay h2 {
+  color: inherit;
+  font-size: 2rem;
+}
+
+.portfolio-overlay p {
+  color: rgba(255, 249, 246, 0.82);
+  line-height: 1.55;
+}
+
+.portfolio-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.portfolio-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex: 1 1 auto;
+}
+
+.portfolio-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(166, 92, 106, 0.22);
+  transition:
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.portfolio-dot.active {
+  background: var(--accent-strong);
+  transform: scale(1.15);
+}
+
 @media (min-width: 760px) {
   .page-frame {
-    width: min(1240px, calc(100% - 2rem));
-    padding-top: 1.4rem;
-  }
-
-  .hero-panel {
-    grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
-    align-items: end;
-    padding: 1.6rem;
+    width: min(540px, calc(100% - 1.5rem));
+    padding-top: 1rem;
   }
 
   .stat-grid,
   .dashboard-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .shell-grid {
-    grid-template-columns: 280px minmax(0, 1fr);
-    align-items: start;
   }
 
   .services-grid {
@@ -840,20 +1024,8 @@ code {
 }
 
 @media (min-width: 1040px) {
-  .dashboard-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .services-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .form-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .detail-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .page-frame {
+    width: min(560px, calc(100% - 2rem));
   }
 }
 

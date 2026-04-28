@@ -1,7 +1,5 @@
 export type ServiceCategory =
   | 'manicure'
-  | 'alongamento'
-  | 'spa'
   | 'pedicure'
   | 'combo'
 
@@ -97,8 +95,10 @@ export interface NotificationItem {
 }
 
 export interface SalonSettings {
+  dataVersion: number
   salonName: string
   ownerName: string
+  tagline: string
   timezone: string
   bookingWindowDays: number
   slotIntervalMinutes: number
@@ -106,6 +106,9 @@ export interface SalonSettings {
   publicPhone: string
   adminWhatsapp: string
   adminEmail: string
+  addressLabel: string
+  mapUrl: string
+  highlights: string[]
   policies: string[]
 }
 

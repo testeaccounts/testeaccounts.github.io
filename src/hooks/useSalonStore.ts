@@ -16,7 +16,7 @@ import {
   updateDoc,
   writeBatch,
 } from 'firebase/firestore'
-import { createSeedState } from '../data/seed'
+import { createSeedState, DEFAULT_DATA_VERSION } from '../data/seed'
 import { addMinutesToTime } from '../lib/dateTime'
 import { firebaseAuth, firestoreDb } from '../lib/firebase'
 import {
@@ -52,6 +52,15 @@ const blockedPeriodsCollectionRef = collection(firestoreDb, 'blockedPeriods')
 const slotLocksCollectionRef = collection(firestoreDb, 'slotLocks')
 const appointmentsCollectionRef = collection(firestoreDb, 'appointments')
 const notificationsCollectionRef = collection(firestoreDb, 'notifications')
+
+const LEGACY_SERVICE_IDS = new Set([
+  'manicure-russa',
+  'blindagem-flex',
+  'spa-dos-pes',
+  'pedicure-classica',
+  'combo-executivo',
+  'alongamento-gel',
+])
 
 const EMPTY_STATE: SalonState = {
   ...seedState,
@@ -136,6 +145,41 @@ async function bootstrapRemoteState() {
   await replaceRemoteState(EMPTY_STATE, seedState)
 }
 
+async function syncRemoteSettingsVersion(currentState: SalonState) {
+  const nextSeed = createSeedState()
+
+  await setDoc(
+    salonDocRef,
+    {
+      settings: {
+        ...currentState.settings,
+        dataVersion: DEFAULT_DATA_VERSION,
+        tagline: currentState.settings.tagline || nextSeed.settings.tagline,
+        addressLabel:
+          currentState.settings.addressLabel || nextSeed.settings.addressLabel,
+        mapUrl: currentState.settings.mapUrl || nextSeed.settings.mapUrl,
+        highlights:
+          currentState.settings.highlights?.length
+            ? currentState.settings.highlights
+            : nextSeed.settings.highlights,
+        policies:
+          currentState.settings.policies?.length
+            ? currentState.settings.policies
+            : nextSeed.settings.policies,
+      },
+    },
+    { merge: true },
+  )
+}
+
+function hasLegacyCatalog(state: SalonState) {
+  return state.services.some((service) => LEGACY_SERVICE_IDS.has(service.id))
+}
+
+function isSeedVersionOutdated(state: SalonState) {
+  return (state.settings.dataVersion ?? 0) < DEFAULT_DATA_VERSION
+}
+
 export interface SalonActions {
   createAppointment: (draft: BookingDraft) => Promise<ActionResult<AppointmentItem>>
   createManualAppointment: (
@@ -196,6 +240,7 @@ export function useSalonStore() {
   const [syncError, setSyncError] = useState('')
   const stateRef = useRef(state)
   const bootstrapAttemptedRef = useRef(false)
+  const migrationAttemptedRef = useRef(false)
   const loadStateRef = useRef({
     config: false,
     services: false,
@@ -403,6 +448,29 @@ export function useSalonStore() {
     state.services.length,
     state.weeklySchedule.length,
   ])
+
+  useEffect(() => {
+    if (loading || migrationAttemptedRef.current || !adminUser) {
+      return
+    }
+
+    const currentState = stateRef.current
+
+    if (!currentState.services.length || !isSeedVersionOutdated(currentState)) {
+      return
+    }
+
+    migrationAttemptedRef.current = true
+
+    const migrationTask = hasLegacyCatalog(currentState)
+      ? replaceRemoteState(currentState, createSeedState())
+      : syncRemoteSettingsVersion(currentState)
+
+    void migrationTask.catch((error: Error) => {
+      migrationAttemptedRef.current = false
+      setSyncError(error.message)
+    })
+  }, [adminUser, loading, state.services.length, state.settings.dataVersion])
 
   async function requireAdmin() {
     if (!firebaseAuth.currentUser) {

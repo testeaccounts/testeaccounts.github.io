@@ -1,15 +1,11 @@
-import { BellRing, CalendarClock, Sparkles } from 'lucide-react'
+import { BellRing, CalendarClock, MapPin, Sparkles } from 'lucide-react'
 import { HashRouter, NavLink, Route, Routes } from 'react-router-dom'
+import { PortfolioCarousel } from './components/PortfolioCarousel'
 import { AdminAccess } from './features/admin/AdminAccess'
 import { BookingFlow } from './features/booking/BookingFlow'
 import { useSalonStore } from './hooks/useSalonStore'
-import { formatLongDate, todayIso } from './lib/dateTime'
-import { formatCurrencyBRL } from './lib/format'
-import {
-  calculateDayOccupancy,
-  calculateProjectedRevenue,
-  getUpcomingAppointments,
-} from './lib/scheduling'
+import { buildUpcomingDates, combineDateTime, formatLongDate, todayIso } from './lib/dateTime'
+import { calculateDayOccupancy } from './lib/scheduling'
 
 function App() {
   const {
@@ -23,16 +19,31 @@ function App() {
     loginAdmin,
     logoutAdmin,
   } = useSalonStore()
-  const upcomingAppointments = getUpcomingAppointments(state, 1)
-  const nextAppointment = upcomingAppointments[0]
-  const nextAppointmentService = nextAppointment
-    ? state.services.find((service) => service.id === nextAppointment.serviceId)
-    : null
-  const readyNotifications = state.notifications.filter(
-    (notification) => notification.status === 'ready',
-  ).length
+
+  const activeServices = state.services.filter((service) => service.active)
+  const bookingDates = buildUpcomingDates(state.settings.bookingWindowDays)
   const occupancyToday = calculateDayOccupancy(state, todayIso())
-  const projectedRevenue = calculateProjectedRevenue(state, todayIso())
+  const nextBookableOption = activeServices
+    .flatMap((service) =>
+      bookingDates.flatMap((date) => {
+        const nextSlot = getAvailableSlots(service.id, date)[0]
+
+        return nextSlot
+          ? [
+              {
+                serviceName: service.name,
+                date,
+                startTime: nextSlot.startTime,
+              },
+            ]
+          : []
+      }),
+    )
+    .sort(
+      (left, right) =>
+        combineDateTime(left.date, left.startTime).getTime() -
+        combineDateTime(right.date, right.startTime).getTime(),
+    )[0]
 
   return (
     <HashRouter>
@@ -42,7 +53,7 @@ function App() {
             <span className="brand-mark">AU</span>
             <div>
               <span className="brand-name">{state.settings.salonName}</span>
-              <p>Autoatendimento e gestão da agenda em um só lugar.</p>
+              <p>Especialista em unhas naturais e esmaltação tradicional.</p>
             </div>
           </div>
 
@@ -65,12 +76,11 @@ function App() {
 
         <section className="hero-panel">
           <div className="hero-copy">
-            <span className="eyebrow">Sistema completo para manicure</span>
-            <h1>A cliente agenda sozinha. A Alyssa gerencia sem confusão.</h1>
+            <span className="eyebrow">Atendimento somente com hora marcada</span>
+            <h1>Agende pé, mão ou pé e mão em poucos toques no celular.</h1>
             <p>
-              Fluxo mobile-first, regras de conflito por duração, painel
-              administrativo e uma central de notificações pronta para integração
-              com WhatsApp ou e-mail.
+              {state.settings.tagline} Veja horários realmente livres, escolha a
+              melhor data e confirme o atendimento sem depender de conversa manual.
             </p>
           </div>
 
@@ -79,95 +89,113 @@ function App() {
               <div className="icon-badge">
                 <CalendarClock size={18} />
               </div>
-              <span>Próximo atendimento</span>
+              <span>Próximo horário livre</span>
               <strong>
-                {nextAppointment
-                  ? `${nextAppointment.client.name} • ${nextAppointment.startTime}`
-                  : 'Agenda pronta para receber reservas'}
+                {nextBookableOption
+                  ? `${nextBookableOption.startTime} • ${nextBookableOption.serviceName}`
+                  : 'Agenda em atualização'}
               </strong>
               <p>
-                {nextAppointment && nextAppointmentService
-                  ? `${nextAppointmentService.name} em ${formatLongDate(nextAppointment.date)}`
-                  : 'Nenhum atendimento futuro cadastrado ainda.'}
+                {nextBookableOption
+                  ? formatLongDate(nextBookableOption.date)
+                  : 'Entre no fluxo de agendamento para consultar as próximas vagas.'}
               </p>
             </article>
 
             <div className="stat-grid">
               <article className="stat-card">
+                <span>Serviços ativos</span>
+                <strong>{activeServices.length}</strong>
+              </article>
+              <article className="stat-card">
+                <span>Janela aberta</span>
+                <strong>{state.settings.bookingWindowDays} dias</strong>
+              </article>
+              <article className="stat-card">
                 <span>Ocupação hoje</span>
                 <strong>{occupancyToday}%</strong>
-              </article>
-              <article className="stat-card">
-                <span>Receita projetada</span>
-                <strong>{formatCurrencyBRL(projectedRevenue)}</strong>
-              </article>
-              <article className="stat-card">
-                <span>Notificações prontas</span>
-                <strong>{readyNotifications}</strong>
               </article>
             </div>
           </div>
         </section>
 
-        <section className="shell-grid">
-          <aside className="side-panel">
+        <section className="support-grid">
+          <article className="panel-card compact-panel">
             <div className="panel-chip">
               <Sparkles size={16} />
-              Jornada principal
+              Diferenciais
             </div>
+            <ul className="highlight-list">
+              {state.settings.highlights.map((highlight) => (
+                <li key={highlight}>{highlight}</li>
+              ))}
+            </ul>
+          </article>
 
-            <ol className="journey-list">
-              <li>Escolher serviço</li>
-              <li>Selecionar data</li>
-              <li>Selecionar horário</li>
-              <li>Informar dados</li>
-              <li>Confirmar agendamento</li>
-            </ol>
-
-            <div className="policy-card">
-              <div className="panel-chip">
-                <BellRing size={16} />
-                Políticas
-              </div>
-              <ul className="policy-list">
-                {state.settings.policies.map((policy) => (
-                  <li key={policy}>{policy}</li>
-                ))}
-              </ul>
+          <article className="panel-card compact-panel">
+            <div className="panel-chip">
+              <BellRing size={16} />
+              Regras rápidas
             </div>
-          </aside>
+            <ul className="policy-list">
+              {state.settings.policies.map((policy) => (
+                <li key={policy}>{policy}</li>
+              ))}
+            </ul>
+          </article>
 
-          <main className="route-frame">
-            <Routes>
-              <Route
-                path="/"
-                element={
-                  <BookingFlow
-                    state={state}
-                    actions={actions}
-                    getAvailableSlots={getAvailableSlots}
-                  />
-                }
-              />
-              <Route
-                path="/admin"
-                element={
-                  <AdminAccess
-                    state={state}
-                    actions={actions}
-                    loading={loading}
-                    authReady={authReady}
-                    adminUser={adminUser}
-                    syncError={syncError}
-                    loginAdmin={loginAdmin}
-                    logoutAdmin={logoutAdmin}
-                    getAvailableSlots={getAvailableSlots}
-                  />
-                }
-              />
-            </Routes>
-          </main>
+          <article className="panel-card compact-panel map-card">
+            <div className="panel-chip">
+              <MapPin size={16} />
+              Endereço
+            </div>
+            <strong>{state.settings.addressLabel}</strong>
+            <p>Santa Fé do Sul - SP</p>
+            {state.settings.mapUrl ? (
+              <a
+                className="primary-button full-width"
+                href={state.settings.mapUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Abrir localização
+              </a>
+            ) : null}
+          </article>
         </section>
+
+        <PortfolioCarousel />
+
+        <main className="route-frame">
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <BookingFlow
+                  state={state}
+                  actions={actions}
+                  getAvailableSlots={getAvailableSlots}
+                />
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <AdminAccess
+                  state={state}
+                  actions={actions}
+                  loading={loading}
+                  authReady={authReady}
+                  adminUser={adminUser}
+                  syncError={syncError}
+                  loginAdmin={loginAdmin}
+                  logoutAdmin={logoutAdmin}
+                  getAvailableSlots={getAvailableSlots}
+                />
+              }
+            />
+          </Routes>
+        </main>
       </div>
     </HashRouter>
   )
