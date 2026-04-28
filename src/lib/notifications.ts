@@ -113,7 +113,7 @@ export function buildCreatedNotifications(
       'whatsapp',
       appointment.client.phone,
       'Confirmação de horário',
-      `Oi, ${appointment.client.name}! Seu horário para ${service.name} foi confirmado para ${scheduledLabel}. Valor previsto: ${formatServicePrice(service.price)}.`,
+      `Oi, ${appointment.client.name}! Seu horário para ${service.name} foi confirmado para ${scheduledLabel}. Valor: ${formatServicePrice(service.price)}.`,
     ),
     buildNotification(
       appointment.id,
@@ -123,17 +123,7 @@ export function buildCreatedNotifications(
       'whatsapp',
       appointment.client.phone,
       'Lembrete de atendimento',
-      `Passando para lembrar do seu atendimento de ${service.name} com a ${settings.ownerName} em ${scheduledLabel}.`,
-    ),
-    buildNotification(
-      appointment.id,
-      'new_booking_alert',
-      'ready',
-      new Date().toISOString(),
-      'internal',
-      settings.adminWhatsapp,
-      'Novo agendamento recebido',
-      `${appointment.client.name} acabou de agendar ${service.name} para ${scheduledLabel}.`,
+      `Lembrete: ${service.name} com ${settings.ownerName} em ${scheduledLabel}.`,
     ),
   ])
 }
@@ -141,8 +131,10 @@ export function buildCreatedNotifications(
 export function buildCancelledNotifications(
   appointment: AppointmentItem,
   service: ServiceItem,
-  settings: SalonSettings,
+  _settings: SalonSettings,
 ) {
+  void _settings
+
   const scheduledLabel = formatDateTimeLabel(
     appointment.date,
     appointment.startTime,
@@ -156,18 +148,8 @@ export function buildCancelledNotifications(
       new Date().toISOString(),
       'whatsapp',
       appointment.client.phone,
-      'Cancelamento do horário',
-      `Seu horário de ${service.name}, marcado para ${scheduledLabel}, foi cancelado. Se quiser, podemos remarcar um novo horário.`,
-    ),
-    buildNotification(
-      appointment.id,
-      'booking_cancelled',
-      'ready',
-      new Date().toISOString(),
-      'internal',
-      settings.adminWhatsapp,
-      'Agendamento cancelado',
-      `${appointment.client.name} teve o agendamento de ${service.name} cancelado (${scheduledLabel}).`,
+      'Horário cancelado',
+      `Seu horário de ${service.name}, marcado para ${scheduledLabel}, foi cancelado.`,
     ),
   ]
 }
@@ -207,18 +189,8 @@ export function buildRescheduledNotifications(
       reminderDateTime.toISOString(),
       'whatsapp',
       appointment.client.phone,
-      'Novo lembrete de atendimento',
+      'Lembrete de atendimento',
       `Lembrete atualizado: ${service.name} com ${settings.ownerName} em ${scheduledLabel}.`,
-    ),
-    buildNotification(
-      appointment.id,
-      'booking_rescheduled',
-      'ready',
-      new Date().toISOString(),
-      'internal',
-      settings.adminWhatsapp,
-      'Agendamento remarcado',
-      `${appointment.client.name} ficou com o atendimento de ${service.name} reagendado para ${scheduledLabel}.`,
     ),
   ])
 }

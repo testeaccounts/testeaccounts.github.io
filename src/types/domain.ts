@@ -9,14 +9,13 @@ export type AppointmentStatus =
   | 'rescheduled'
   | 'cancelled'
 
-export type NotificationChannel = 'whatsapp' | 'email' | 'internal'
+export type NotificationChannel = 'whatsapp' | 'email'
 
 export type NotificationKind =
   | 'booking_confirmation'
   | 'booking_reminder'
   | 'booking_cancelled'
   | 'booking_rescheduled'
-  | 'new_booking_alert'
 
 export type NotificationStatus = 'pending' | 'ready' | 'sent' | 'cancelled'
 

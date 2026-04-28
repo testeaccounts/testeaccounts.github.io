@@ -62,6 +62,12 @@ const LEGACY_SERVICE_IDS = new Set([
   'alongamento-gel',
 ])
 
+const DEFAULT_SERVICE_IDS = new Set([
+  'mao-tradicional',
+  'pe-tradicional',
+  'pe-e-mao-tradicional',
+])
+
 const EMPTY_STATE: SalonState = {
   ...seedState,
   services: [],
@@ -154,18 +160,13 @@ async function syncRemoteSettingsVersion(currentState: SalonState) {
       settings: {
         ...currentState.settings,
         dataVersion: DEFAULT_DATA_VERSION,
-        tagline: currentState.settings.tagline || nextSeed.settings.tagline,
-        addressLabel:
-          currentState.settings.addressLabel || nextSeed.settings.addressLabel,
-        mapUrl: currentState.settings.mapUrl || nextSeed.settings.mapUrl,
-        highlights:
-          currentState.settings.highlights?.length
-            ? currentState.settings.highlights
-            : nextSeed.settings.highlights,
-        policies:
-          currentState.settings.policies?.length
-            ? currentState.settings.policies
-            : nextSeed.settings.policies,
+        salonName: currentState.settings.salonName || nextSeed.settings.salonName,
+        ownerName: currentState.settings.ownerName || nextSeed.settings.ownerName,
+        tagline: '',
+        addressLabel: '',
+        mapUrl: '',
+        highlights: [],
+        policies: [],
       },
     },
     { merge: true },
@@ -174,6 +175,16 @@ async function syncRemoteSettingsVersion(currentState: SalonState) {
 
 function hasLegacyCatalog(state: SalonState) {
   return state.services.some((service) => LEGACY_SERVICE_IDS.has(service.id))
+}
+
+function looksLikePreviousSeedData(state: SalonState) {
+  return (
+    state.appointments.length === 3 &&
+    state.appointments.every((appointment) =>
+      DEFAULT_SERVICE_IDS.has(appointment.serviceId),
+    ) &&
+    state.blockedPeriods.length === 2
+  )
 }
 
 function isSeedVersionOutdated(state: SalonState) {
@@ -207,8 +218,7 @@ export interface SalonActions {
     reason: string
   }) => Promise<ActionResult>
   removeBlockedPeriod: (blockId: string) => Promise<ActionResult>
-  markNotificationSent: (notificationId: string) => Promise<ActionResult>
-  resetDemoData: () => Promise<ActionResult>
+  resetBaseData: () => Promise<ActionResult>
 }
 
 function buildSlotLocksForAppointment(
@@ -462,7 +472,8 @@ export function useSalonStore() {
 
     migrationAttemptedRef.current = true
 
-    const migrationTask = hasLegacyCatalog(currentState)
+    const migrationTask =
+      hasLegacyCatalog(currentState) || looksLikePreviousSeedData(currentState)
       ? replaceRemoteState(currentState, createSeedState())
       : syncRemoteSettingsVersion(currentState)
 
@@ -476,7 +487,7 @@ export function useSalonStore() {
     if (!firebaseAuth.currentUser) {
       return {
         ok: false,
-        error: 'Entre com a conta da Alissa para acessar essa ação.',
+        error: 'Entre com a conta da Alyssa para acessar essa ação.',
       } satisfies ActionResult
     }
 
@@ -811,6 +822,13 @@ export function useSalonStore() {
         } satisfies ActionResult<ServiceItem>
       }
 
+      if (values.durationMinutes <= 0 || values.price < 0) {
+        return {
+          ok: false,
+          error: 'Revise duração e valor do serviço.',
+        } satisfies ActionResult<ServiceItem>
+      }
+
       const service: ServiceItem = {
         ...values,
         id: values.id ?? createId('service'),
@@ -864,15 +882,28 @@ export function useSalonStore() {
         return adminCheck
       }
 
+      const invalidDay = days.find((day) =>
+        day.enabled
+          ? !day.periods[0]?.start ||
+            !day.periods[0]?.end ||
+            day.periods[0].start >= day.periods[0].end
+          : false,
+      )
+
+      if (invalidDay) {
+        return {
+          ok: false,
+          error: `Revise o horário de ${invalidDay.label}.`,
+        } satisfies ActionResult
+      }
+
       await setDoc(
         salonDocRef,
         {
           settings: stateRef.current.settings,
           weeklySchedule: days.map((day) => ({
             ...day,
-            periods: day.periods.filter(
-              (period) => period.start.trim() && period.end.trim(),
-            ),
+            periods: day.enabled ? day.periods.slice(0, 1) : [],
           })),
         },
         { merge: true },
@@ -934,20 +965,7 @@ export function useSalonStore() {
       await deleteDoc(doc(blockedPeriodsCollectionRef, blockId))
       return { ok: true } satisfies ActionResult
     },
-    async markNotificationSent(notificationId) {
-      const adminCheck = await requireAdmin()
-
-      if (!adminCheck.ok) {
-        return adminCheck
-      }
-
-      await updateDoc(doc(notificationsCollectionRef, notificationId), {
-        status: 'sent',
-      })
-
-      return { ok: true } satisfies ActionResult
-    },
-    async resetDemoData() {
+    async resetBaseData() {
       const adminCheck = await requireAdmin()
 
       if (!adminCheck.ok) {

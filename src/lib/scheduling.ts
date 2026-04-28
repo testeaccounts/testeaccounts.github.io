@@ -11,6 +11,7 @@ import {
   getWeekday,
   isPastCalendarDay,
   timeToMinutes,
+  todayIso,
 } from './dateTime'
 
 export const blockingStatuses: AppointmentStatus[] = [
@@ -104,6 +105,8 @@ export function getAvailableSlots(
   )
 
   const slots: SlotOption[] = []
+  const isToday = date === todayIso()
+  const now = new Date()
 
   for (const period of daySchedule.periods) {
     for (
@@ -113,6 +116,10 @@ export function getAvailableSlots(
     ) {
       const startTime = `${String(Math.floor(cursor / 60)).padStart(2, '0')}:${String(cursor % 60).padStart(2, '0')}`
       const endTime = addMinutesToTime(startTime, service.durationMinutes)
+
+      if (isToday && combineDateTime(date, startTime) <= now) {
+        continue
+      }
 
       const blockedByPeriod = dayBlocks.some((block) =>
         rangesOverlap(startTime, endTime, block.start, block.end),

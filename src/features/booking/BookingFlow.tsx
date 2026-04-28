@@ -1,23 +1,11 @@
 import { useState, useTransition } from 'react'
-import { Link } from 'react-router-dom'
-import {
-  CalendarDays,
-  CheckCircle2,
-  ChevronRight,
-  Clock3,
-  Phone,
-  Sparkles,
-} from 'lucide-react'
+import { CalendarDays, CheckCircle2, Clock3, Phone } from 'lucide-react'
 import { buildUpcomingDates, formatLongDate, formatShortDate } from '../../lib/dateTime'
 import { formatDuration, formatPhoneDisplay, formatServicePrice } from '../../lib/format'
 import { getServiceById } from '../../lib/scheduling'
 import { validateBookingForm } from '../../lib/validators'
 import type { SalonActions } from '../../hooks/useSalonStore'
-import type {
-  BookingFormValues,
-  SalonState,
-  SlotOption,
-} from '../../types/domain'
+import type { BookingFormValues, SalonState, SlotOption } from '../../types/domain'
 
 interface BookingFlowProps {
   state: SalonState
@@ -55,7 +43,7 @@ export function BookingFlow({
     type: 'idle',
     message: '',
   })
-  const [confirmationId, setConfirmationId] = useState('')
+  const [hasConfirmation, setHasConfirmation] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSelectingDate, startDateTransition] = useTransition()
 
@@ -79,14 +67,20 @@ export function BookingFlow({
     ? selectedTime
     : ''
 
+  function clearFeedback() {
+    setFeedback({
+      type: 'idle',
+      message: '',
+    })
+    setHasConfirmation(false)
+  }
+
   function handleSelectService(serviceId: string) {
     startDateTransition(() => {
       setSelectedServiceId(serviceId)
+      setSelectedDate('')
       setSelectedTime('')
-      setFeedback({
-        type: 'idle',
-        message: '',
-      })
+      clearFeedback()
     })
   }
 
@@ -94,10 +88,7 @@ export function BookingFlow({
     startDateTransition(() => {
       setSelectedDate(date)
       setSelectedTime('')
-      setFeedback({
-        type: 'idle',
-        message: '',
-      })
+      clearFeedback()
     })
   }
 
@@ -108,8 +99,7 @@ export function BookingFlow({
     if (!selectedServiceId || !effectiveDate || !effectiveTime) {
       setFeedback({
         type: 'error',
-        message:
-          'Escolha um serviço, uma data e um horário disponível antes de confirmar.',
+        message: 'Escolha um serviço, uma data e um horário disponível.',
       })
       return
     }
@@ -117,7 +107,7 @@ export function BookingFlow({
     if (Object.keys(nextErrors).length > 0) {
       setFeedback({
         type: 'error',
-        message: 'Revise os dados da cliente para concluir o agendamento.',
+        message: 'Revise seus dados para confirmar o agendamento.',
       })
       return
     }
@@ -140,111 +130,94 @@ export function BookingFlow({
 
     setIsSubmitting(false)
 
-    if (!result.ok || !result.data) {
+    if (!result.ok) {
       setFeedback({
         type: 'error',
-        message:
-          result.error ??
-          'Não foi possível concluir o agendamento. Tente novamente.',
+        message: result.error ?? 'Não foi possível concluir o agendamento.',
       })
       return
     }
 
-    setConfirmationId(result.data.id)
+    setHasConfirmation(true)
     setFeedback({
       type: 'success',
-      message:
-        'Horário confirmado com sucesso. Os dados foram gravados no Firebase e o lembrete ficou preparado na central de notificações.',
+      message: 'Agendamento confirmado. A confirmação apareceu no fluxo do sistema.',
     })
     setFormValues(initialForm)
     setFieldErrors({})
   }
 
+  if (!state.weeklySchedule.length && !activeServices.length) {
+    return (
+      <section className="empty-state">
+        <CalendarDays size={18} />
+        Carregando agenda...
+      </section>
+    )
+  }
+
   return (
     <div className="booking-layout">
       <section className="page-intro">
-        <span className="eyebrow">Autoatendimento</span>
-        <h1>Escolha o serviço e reserve seu horário</h1>
-        <p>
-          Atendimento pensado para unhas naturais, esmaltação tradicional e um
-          agendamento simples de usar no celular.
-        </p>
-      </section>
-
-      <section className="summary-card booking-note-card">
-        <div className="summary-row">
-          <span>Especialidade</span>
-          <strong>Unhas naturais</strong>
-        </div>
-        <div className="summary-row">
-          <span>Formato</span>
-          <strong>Atendimento somente com hora marcada</strong>
-        </div>
-        <div className="summary-row">
-          <span>Observação</span>
-          <strong>Não atendo a domicílio</strong>
-        </div>
+        <span className="eyebrow">Hora marcada</span>
+        <h1>Agende seu horário</h1>
       </section>
 
       <section className="step-card">
         <div className="step-head">
           <span className="step-index">1</span>
           <div>
-            <h2>Escolha o serviço</h2>
-            <p>Veja a duração do atendimento e selecione o que combina com você.</p>
+            <h2>Serviço</h2>
+            <p>Escolha o atendimento.</p>
           </div>
         </div>
 
-        <div className="services-grid">
-          {activeServices.map((service) => {
-            const isActive = service.id === selectedServiceId
+        {activeServices.length ? (
+          <div className="services-grid">
+            {activeServices.map((service) => {
+              const isActive = service.id === selectedServiceId
 
-            return (
-              <button
-                key={service.id}
-                type="button"
-                className={`service-card accent-${service.accent} ${
-                  isActive ? 'selected' : ''
-                }`}
-                onClick={() => handleSelectService(service.id)}
-              >
-                <div className="service-card-top">
-                  <span className="service-pill">
-                    {service.featured ? 'Tradicional' : 'Hora marcada'}
-                  </span>
-                  <ChevronRight size={18} />
-                </div>
-                <h3>{service.name}</h3>
-                <p>{service.description}</p>
-                <div className="service-meta">
-                  <span>
-                    <Clock3 size={16} />
-                    {formatDuration(service.durationMinutes)}
-                  </span>
-                  <strong>{formatServicePrice(service.price)}</strong>
-                </div>
-              </button>
-            )
-          })}
-        </div>
+              return (
+                <button
+                  key={service.id}
+                  type="button"
+                  className={`service-card accent-${service.accent} ${
+                    isActive ? 'selected' : ''
+                  }`}
+                  onClick={() => handleSelectService(service.id)}
+                >
+                  <h3>{service.name}</h3>
+                  {service.description ? <p>{service.description}</p> : null}
+                  <div className="service-meta">
+                    <span>
+                      <Clock3 size={16} />
+                      {formatDuration(service.durationMinutes)}
+                    </span>
+                    <strong>{formatServicePrice(service.price)}</strong>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="empty-state compact">
+            Alyssa ainda não liberou serviços para agendamento.
+          </div>
+        )}
       </section>
 
       <section className="step-card">
         <div className="step-head">
           <span className="step-index">2</span>
           <div>
-            <h2>Escolha a data</h2>
-            <p>
-              Os horários abaixo já respeitam funcionamento, bloqueios e tempo
-              total do serviço.
-            </p>
+            <h2>Data</h2>
+            <p>Apenas dias com horários livres ficam ativos.</p>
           </div>
         </div>
 
         {!selectedServiceId ? (
           <div className="empty-state compact">
-            <Sparkles size={18} />
-            Selecione um serviço para liberar o calendário.
+            Selecione um serviço para ver as datas.
           </div>
         ) : (
           <>
@@ -263,22 +236,15 @@ export function BookingFlow({
                     disabled={!hasSlots}
                   >
                     <span>{formatShortDate(date)}</span>
-                    <small>{hasSlots ? 'com horário' : 'indisponível'}</small>
+                    <small>{hasSlots ? 'Disponível' : 'Sem horário'}</small>
                   </button>
                 )
               })}
             </div>
 
-            {nextAvailableDate ? (
-              <p className="helper-line">
-                Próxima data com vagas: <strong>{formatLongDate(nextAvailableDate)}</strong>
-              </p>
-            ) : (
-              <p className="helper-line">
-                Não há vagas na janela atual. Ajuste o funcionamento pelo painel
-                da Alissa para liberar novas datas.
-              </p>
-            )}
+            {!nextAvailableDate ? (
+              <p className="helper-line">Nenhuma data disponível na janela atual.</p>
+            ) : null}
           </>
         )}
       </section>
@@ -287,28 +253,24 @@ export function BookingFlow({
         <div className="step-head">
           <span className="step-index">3</span>
           <div>
-            <h2>Escolha o horário</h2>
-            <p>
-              Cada botão já representa um início possível sem sobrepor outro
-              atendimento.
-            </p>
+            <h2>Horário</h2>
+            <p>Os horários respeitam a janela definida pela Alyssa.</p>
           </div>
         </div>
 
         {!effectiveDate ? (
           <div className="empty-state compact">
-            <CalendarDays size={18} />
-            Escolha a data para ver os horários livres.
+            Escolha uma data para ver horários.
           </div>
         ) : (
           <>
             <div className="section-highlight">
               <strong>{formatLongDate(effectiveDate)}</strong>
-              <span>{selectedService ? selectedService.name : 'Serviço não selecionado'}</span>
+              <span>{selectedService?.name}</span>
             </div>
 
             {isSelectingDate ? (
-              <div className="empty-state compact">Atualizando disponibilidade...</div>
+              <div className="empty-state compact">Atualizando horários...</div>
             ) : availableSlots.length ? (
               <div className="slot-grid">
                 {availableSlots.map((slot) => (
@@ -318,7 +280,10 @@ export function BookingFlow({
                     className={`slot-button ${
                       effectiveTime === slot.startTime ? 'selected' : ''
                     }`}
-                    onClick={() => setSelectedTime(slot.startTime)}
+                    onClick={() => {
+                      setSelectedTime(slot.startTime)
+                      clearFeedback()
+                    }}
                   >
                     <strong>{slot.startTime}</strong>
                     <span>até {slot.endTime}</span>
@@ -326,9 +291,7 @@ export function BookingFlow({
                 ))}
               </div>
             ) : (
-              <div className="empty-state compact">
-                Nenhum horário livre nessa data para a duração desse serviço.
-              </div>
+              <div className="empty-state compact">Nenhum horário livre nessa data.</div>
             )}
           </>
         )}
@@ -338,17 +301,16 @@ export function BookingFlow({
         <div className="step-head">
           <span className="step-index">4</span>
           <div>
-            <h2>Informe seus dados</h2>
-            <p>Nome e telefone são obrigatórios para confirmar e lembrar do horário.</p>
+            <h2>Seus dados</h2>
+            <p>Nome e WhatsApp são obrigatórios.</p>
           </div>
         </div>
 
         <div className="form-grid">
           <label className="input-shell">
-            <span>Nome da cliente</span>
+            <span>Nome</span>
             <input
               type="text"
-              placeholder="Ex.: Ana Souza"
               value={formValues.name}
               onChange={(event) =>
                 setFormValues((current) => ({
@@ -364,7 +326,6 @@ export function BookingFlow({
             <span>WhatsApp</span>
             <input
               type="tel"
-              placeholder="(11) 99999-9999"
               value={formatPhoneDisplay(formValues.phone)}
               onChange={(event) =>
                 setFormValues((current) => ({
@@ -380,7 +341,6 @@ export function BookingFlow({
             <span>E-mail opcional</span>
             <input
               type="email"
-              placeholder="voce@email.com"
               value={formValues.email}
               onChange={(event) =>
                 setFormValues((current) => ({
@@ -393,10 +353,9 @@ export function BookingFlow({
           </label>
 
           <label className="input-shell full">
-            <span>Observações</span>
+            <span>Detalhes opcionais</span>
             <textarea
-              rows={4}
-              placeholder="Conte preferências de cor, sensibilidade ou qualquer detalhe importante."
+              rows={3}
               value={formValues.notes}
               onChange={(event) =>
                 setFormValues((current) => ({
@@ -413,29 +372,23 @@ export function BookingFlow({
         <div className="step-head">
           <span className="step-index">5</span>
           <div>
-            <h2>Revise e confirme</h2>
-            <p>O resumo abaixo mostra exatamente o horário que será reservado.</p>
+            <h2>Confirmar</h2>
+            <p>Confira antes de reservar.</p>
           </div>
         </div>
 
-        <div className="summary-card">
+        <div className="summary-card flat">
           <div className="summary-row">
             <span>Serviço</span>
-            <strong>{selectedService?.name ?? 'Selecione um serviço'}</strong>
+            <strong>{selectedService?.name ?? 'Selecione'}</strong>
           </div>
           <div className="summary-row">
             <span>Data</span>
-            <strong>{effectiveDate ? formatLongDate(effectiveDate) : 'Escolha uma data'}</strong>
+            <strong>{effectiveDate ? formatLongDate(effectiveDate) : 'Selecione'}</strong>
           </div>
           <div className="summary-row">
             <span>Horário</span>
-            <strong>{effectiveTime || 'Escolha um horário'}</strong>
-          </div>
-          <div className="summary-row">
-            <span>Investimento</span>
-            <strong>
-              {selectedService ? formatServicePrice(selectedService.price) : '--'}
-            </strong>
+            <strong>{effectiveTime || 'Selecione'}</strong>
           </div>
         </div>
 
@@ -453,39 +406,24 @@ export function BookingFlow({
             onClick={() => void handleSubmit()}
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Confirmando horário...' : 'Confirmar agendamento'}
+            {isSubmitting ? 'Confirmando...' : 'Confirmar agendamento'}
           </button>
-          <Link className="ghost-button" to="/admin">
-            Entrar no painel da Alyssa
-          </Link>
         </div>
 
-        {confirmationId ? (
-          <div className="confirmation-card">
-            <div>
-              <strong>Agendamento concluído</strong>
-              <p>
-                Código interno <code>{confirmationId.slice(0, 12)}</code> gerado para
-                acompanhamento no painel.
-              </p>
-            </div>
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => {
-                setSelectedServiceId('')
-                setSelectedDate('')
-                setSelectedTime('')
-                setConfirmationId('')
-                setFeedback({
-                  type: 'idle',
-                  message: '',
-                })
-              }}
-            >
-              Fazer novo agendamento
-            </button>
-          </div>
+        {hasConfirmation ? (
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => {
+              setSelectedServiceId('')
+              setSelectedDate('')
+              setSelectedTime('')
+              setHasConfirmation(false)
+              clearFeedback()
+            }}
+          >
+            Fazer novo agendamento
+          </button>
         ) : null}
       </section>
     </div>

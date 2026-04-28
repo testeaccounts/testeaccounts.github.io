@@ -1,29 +1,14 @@
 import { useDeferredValue, useState } from 'react'
 import {
-  BellRing,
   CalendarClock,
   CalendarRange,
   CheckCircle2,
-  Copy,
-  LayoutGrid,
-  ListFilter,
   Scissors,
   ShieldBan,
-  Users,
 } from 'lucide-react'
-import { buildUpcomingDates, formatLongDate, formatTimestamp, todayIso } from '../../lib/dateTime'
-import {
-  createWhatsAppLink,
-  formatDuration,
-  formatPhoneDisplay,
-  formatServicePrice,
-} from '../../lib/format'
-import {
-  calculateDayOccupancy,
-  getServiceById,
-  getUniqueClients,
-  getUpcomingAppointments,
-} from '../../lib/scheduling'
+import { buildUpcomingDates, formatLongDate, todayIso } from '../../lib/dateTime'
+import { formatDuration, formatPhoneDisplay, formatServicePrice } from '../../lib/format'
+import { getServiceById, sortAppointments } from '../../lib/scheduling'
 import type { SalonActions } from '../../hooks/useSalonStore'
 import type { BookingDraft, SalonState, ServiceCategory, WeeklyScheduleDay } from '../../types/domain'
 
@@ -41,23 +26,13 @@ interface AdminDashboardProps {
   }[]
 }
 
-type AdminTab =
-  | 'overview'
-  | 'agenda'
-  | 'services'
-  | 'hours'
-  | 'blocks'
-  | 'clients'
-  | 'notifications'
+type AdminTab = 'agenda' | 'services' | 'hours' | 'blocks'
 
-const tabItems: { id: AdminTab; label: string; icon: typeof LayoutGrid }[] = [
-  { id: 'overview', label: 'Visão geral', icon: LayoutGrid },
+const tabItems: { id: AdminTab; label: string; icon: typeof CalendarClock }[] = [
   { id: 'agenda', label: 'Agenda', icon: CalendarClock },
   { id: 'services', label: 'Serviços', icon: Scissors },
-  { id: 'hours', label: 'Funcionamento', icon: CalendarRange },
+  { id: 'hours', label: 'Horários', icon: CalendarRange },
   { id: 'blocks', label: 'Bloqueios', icon: ShieldBan },
-  { id: 'clients', label: 'Clientes', icon: Users },
-  { id: 'notifications', label: 'Notificações', icon: BellRing },
 ]
 
 const emptyServiceForm = {
@@ -84,19 +59,28 @@ function createManualDraft(): BookingDraft {
   }
 }
 
+function statusLabel(status: string) {
+  const labels: Record<string, string> = {
+    pending: 'Pendente',
+    confirmed: 'Confirmado',
+    rescheduled: 'Remarcado',
+    cancelled: 'Cancelado',
+  }
+
+  return labels[status] ?? status
+}
+
 export function AdminDashboard({
   state,
   actions,
   getAvailableSlots,
 }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<AdminTab>('overview')
+  const [activeTab, setActiveTab] = useState<AdminTab>('agenda')
   const [agendaDate, setAgendaDate] = useState(todayIso())
   const [searchQuery, setSearchQuery] = useState('')
   const deferredQuery = useDeferredValue(searchQuery)
   const [serviceForm, setServiceForm] = useState(emptyServiceForm)
-  const [scheduleDraft, setScheduleDraft] = useState<WeeklyScheduleDay[]>(
-    state.weeklySchedule,
-  )
+  const [scheduleDraft, setScheduleDraft] = useState<WeeklyScheduleDay[]>([])
   const [blockForm, setBlockForm] = useState({
     date: todayIso(),
     start: '09:00',
@@ -116,17 +100,10 @@ export function AdminDashboard({
   })
   const [isBusy, setIsBusy] = useState(false)
 
-  const today = todayIso()
-  const readyNotifications = state.notifications.filter(
-    (notification) => notification.status === 'ready',
-  )
-  const upcomingAppointments = getUpcomingAppointments(state, 5)
-  const occupancyToday = calculateDayOccupancy(state, today)
-  const clients = getUniqueClients(state)
   const datesWindow = buildUpcomingDates(state.settings.bookingWindowDays)
   const activeServices = state.services.filter((service) => service.active)
-
-  const filteredAppointments = state.appointments.filter((appointment) => {
+  const editableSchedule = scheduleDraft.length ? scheduleDraft : state.weeklySchedule
+  const filteredAppointments = sortAppointments(state.appointments).filter((appointment) => {
     if (appointment.date !== agendaDate) {
       return false
     }
@@ -139,7 +116,7 @@ export function AdminDashboard({
     const haystack = [
       appointment.client.name,
       appointment.client.phone,
-      appointment.status,
+      statusLabel(appointment.status),
       service?.name ?? '',
     ]
       .join(' ')
@@ -201,23 +178,21 @@ export function AdminDashboard({
       return
     }
 
-    setSuccess(
-      serviceForm.id ? 'Serviço atualizado com sucesso.' : 'Novo serviço cadastrado.',
-    )
+    setSuccess(serviceForm.id ? 'Serviço atualizado.' : 'Serviço cadastrado.')
     resetServiceForm()
   }
 
   async function handleScheduleSave() {
     setIsBusy(true)
-    const result = await actions.updateWeeklySchedule(scheduleDraft)
+    const result = await actions.updateWeeklySchedule(editableSchedule)
     setIsBusy(false)
 
     if (!result.ok) {
-      setError(result.error ?? 'Não foi possível salvar o funcionamento.')
+      setError(result.error ?? 'Não foi possível salvar os horários.')
       return
     }
 
-    setSuccess('Funcionamento semanal atualizado no Firebase.')
+    setSuccess('Horários atualizados.')
   }
 
   async function handleBlockSubmit() {
@@ -230,7 +205,7 @@ export function AdminDashboard({
       return
     }
 
-    setSuccess('Bloqueio adicionado à agenda.')
+    setSuccess('Bloqueio adicionado.')
     setBlockForm({
       date: todayIso(),
       start: '09:00',
@@ -240,9 +215,37 @@ export function AdminDashboard({
     })
   }
 
+  async function handleManualAppointmentSubmit() {
+    if (
+      !manualDraft.serviceId ||
+      !manualDraft.date ||
+      !manualDraft.startTime ||
+      !manualDraft.name.trim() ||
+      !manualDraft.phone.trim()
+    ) {
+      setError('Preencha serviço, data, horário, nome e WhatsApp.')
+      return
+    }
+
+    setIsBusy(true)
+    const result = await actions.createManualAppointment({
+      ...manualDraft,
+      phone: manualDraft.phone.replace(/\D/g, ''),
+    })
+    setIsBusy(false)
+
+    if (!result.ok) {
+      setError(result.error ?? 'Não foi possível criar o agendamento.')
+      return
+    }
+
+    setSuccess('Agendamento registrado.')
+    setManualDraft(createManualDraft())
+  }
+
   async function handleRescheduleSubmit() {
     if (!rescheduleDraft?.startTime) {
-      setError('Escolha um novo horário para concluir a remarcação.')
+      setError('Escolha um novo horário.')
       return
     }
 
@@ -255,60 +258,30 @@ export function AdminDashboard({
     setIsBusy(false)
 
     if (!result.ok) {
-      setError(result.error ?? 'Não foi possível remarcar esse agendamento.')
+      setError(result.error ?? 'Não foi possível remarcar.')
       return
     }
 
-    setSuccess('Agendamento remarcado com sucesso.')
+    setSuccess('Agendamento remarcado.')
     setRescheduleDraft(null)
   }
 
-  async function handleManualAppointmentSubmit() {
-    if (
-      !manualDraft.serviceId ||
-      !manualDraft.date ||
-      !manualDraft.startTime ||
-      !manualDraft.name.trim() ||
-      !manualDraft.phone.trim()
-    ) {
-      setError('Preencha serviço, data, horário, nome e telefone da cliente.')
-      return
-    }
+  function updateScheduleDay(
+    dayIndex: number,
+    updater: (day: WeeklyScheduleDay) => WeeklyScheduleDay,
+  ) {
+    setScheduleDraft((current) => {
+      const source = current.length ? current : state.weeklySchedule
 
-    setIsBusy(true)
-    const result = await actions.createManualAppointment({
-      ...manualDraft,
-      phone: manualDraft.phone.replace(/\D/g, ''),
+      return source.map((day, index) => (index === dayIndex ? updater(day) : day))
     })
-    setIsBusy(false)
-
-    if (!result.ok) {
-      setError(result.error ?? 'Não foi possível criar o horário manual.')
-      return
-    }
-
-    setSuccess('Horário manual da cliente registrado com sucesso.')
-    setManualDraft(createManualDraft())
-  }
-
-  async function copyMessage(message: string) {
-    try {
-      await navigator.clipboard.writeText(message)
-      setSuccess('Mensagem copiada para a área de transferência.')
-    } catch {
-      setError('Não consegui copiar a mensagem automaticamente.')
-    }
   }
 
   return (
     <div className="admin-layout">
       <section className="page-intro">
         <span className="eyebrow">Painel da Alyssa</span>
-        <h1>Agenda, horários e clientes organizados em um só lugar</h1>
-        <p>
-          Painel pensado para esmaltação tradicional, horários sem conflito e um
-          atendimento mais leve no dia a dia.
-        </p>
+        <h1>Agenda e horários</h1>
       </section>
 
       {feedback.tone !== 'idle' ? (
@@ -336,72 +309,17 @@ export function AdminDashboard({
         })}
       </div>
 
-      {activeTab === 'overview' ? (
-        <div className="dashboard-grid">
-          <article className="metric-card">
-            <span>Ocupação hoje</span>
-            <strong>{occupancyToday}%</strong>
-            <p>Baseado nos horários já reservados e no funcionamento do dia.</p>
-          </article>
-          <article className="metric-card">
-            <span>Serviços ativos</span>
-            <strong>{activeServices.length}</strong>
-            <p>Catálogo visível para o agendamento das clientes.</p>
-          </article>
-          <article className="metric-card">
-            <span>Clientes cadastradas</span>
-            <strong>{clients.length}</strong>
-            <p>Quantidade derivada dos agendamentos registrados.</p>
-          </article>
-          <article className="metric-card">
-            <span>Notificações prontas</span>
-            <strong>{readyNotifications.length}</strong>
-            <p>Central com confirmações, lembretes e alertas para enviar.</p>
-          </article>
-
-          <article className="panel-card wide">
-            <div className="panel-head">
-              <div>
-                <h2>Próximos atendimentos</h2>
-                <p>Visão rápida do que já está chegando na agenda.</p>
-              </div>
-            </div>
-
-            <div className="list-stack">
-              {upcomingAppointments.map((appointment) => {
-                const service = getServiceById(state, appointment.serviceId)
-
-                return (
-                  <div key={appointment.id} className="list-item appointment-row">
-                    <div>
-                      <strong>{appointment.client.name}</strong>
-                      <p>
-                        {service?.name ?? 'Serviço'} • {formatLongDate(appointment.date)} •{' '}
-                        {appointment.startTime}
-                      </p>
-                    </div>
-                    <span className={`status-pill ${appointment.status}`}>
-                      {appointment.status}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </article>
-
-        </div>
-      ) : null}
-
       {activeTab === 'agenda' ? (
-        <div className="panel-card">
-            <div className="panel-head">
-              <div>
-                <h2>Agenda do dia</h2>
-                </div>
+        <section className="panel-card">
+          <div className="panel-head">
+            <div>
+              <h2>Agenda</h2>
+              <p>Agendamentos confirmados e novos horários manuais.</p>
             </div>
+          </div>
 
-          <div className="summary-card">
-            <h3>Novo horário manual</h3>
+          <div className="form-panel">
+            <h3>Novo agendamento</h3>
             <div className="form-grid">
               <label className="input-shell">
                 <span>Serviço</span>
@@ -416,13 +334,11 @@ export function AdminDashboard({
                   }
                 >
                   <option value="">Selecione</option>
-                  {state.services
-                    .filter((service) => service.active)
-                    .map((service) => (
-                      <option key={service.id} value={service.id}>
-                        {service.name}
-                      </option>
-                    ))}
+                  {activeServices.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name}
+                    </option>
+                  ))}
                 </select>
               </label>
 
@@ -442,7 +358,7 @@ export function AdminDashboard({
               </label>
 
               <label className="input-shell">
-                <span>Nome da cliente</span>
+                <span>Nome</span>
                 <input
                   type="text"
                   value={manualDraft.name}
@@ -470,7 +386,7 @@ export function AdminDashboard({
               </label>
 
               <label className="input-shell">
-                <span>E-mail</span>
+                <span>E-mail opcional</span>
                 <input
                   type="email"
                   value={manualDraft.email}
@@ -484,7 +400,7 @@ export function AdminDashboard({
               </label>
 
               <label className="input-shell full">
-                <span>Observações</span>
+                <span>Detalhes opcionais</span>
                 <textarea
                   rows={3}
                   value={manualDraft.notes}
@@ -521,18 +437,18 @@ export function AdminDashboard({
               </div>
             ) : (
               <div className="empty-state compact">
-                Nenhum horário livre para o serviço e data escolhidos.
+                Escolha serviço e data para ver horários livres.
               </div>
             )}
 
-            <div className="actions-row wrap">
+            <div className="actions-row">
               <button
                 type="button"
                 className="primary-button"
                 onClick={() => void handleManualAppointmentSubmit()}
                 disabled={isBusy}
               >
-                {isBusy ? 'Salvando...' : 'Salvar horário da cliente'}
+                {isBusy ? 'Salvando...' : 'Salvar agendamento'}
               </button>
             </div>
           </div>
@@ -550,10 +466,9 @@ export function AdminDashboard({
             </label>
 
             <label className="input-shell">
-              <span>Buscar cliente ou serviço</span>
+              <span>Buscar</span>
               <input
                 type="search"
-                placeholder="Nome, telefone ou serviço"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
               />
@@ -572,20 +487,22 @@ export function AdminDashboard({
                       <div>
                         <strong>{appointment.client.name}</strong>
                         <p>
-                          {appointment.startTime} • {service?.name ?? 'Serviço'} •{' '}
-                          {formatServicePrice(service?.price ?? 0)}
+                          {appointment.startTime} - {appointment.endTime} -{' '}
+                          {service?.name ?? 'Serviço'}
                         </p>
                       </div>
                       <span className={`status-pill ${appointment.status}`}>
-                        {appointment.status}
+                        {statusLabel(appointment.status)}
                       </span>
                     </div>
 
                     <div className="detail-grid">
                       <span>WhatsApp: {formatPhoneDisplay(appointment.client.phone)}</span>
                       <span>Duração: {formatDuration(service?.durationMinutes ?? 0)}</span>
-                      <span>Origem: {appointment.origin}</span>
-                      <span>Observações: {appointment.notes || 'Sem observações'}</span>
+                      {appointment.client.email ? (
+                        <span>E-mail: {appointment.client.email}</span>
+                      ) : null}
+                      {appointment.notes ? <span>Detalhes: {appointment.notes}</span> : null}
                     </div>
 
                     <div className="actions-row wrap">
@@ -648,26 +565,24 @@ export function AdminDashboard({
 
                     {isEditing ? (
                       <div className="reschedule-box">
-                        <div className="filters-row">
-                          <label className="input-shell">
-                            <span>Nova data</span>
-                            <input
-                              type="date"
-                              value={rescheduleDraft.date}
-                              onChange={(event) =>
-                                setRescheduleDraft((current) =>
-                                  current
-                                    ? {
-                                        ...current,
-                                        date: event.target.value,
-                                        startTime: '',
-                                      }
-                                    : current,
-                                )
-                              }
-                            />
-                          </label>
-                        </div>
+                        <label className="input-shell">
+                          <span>Nova data</span>
+                          <input
+                            type="date"
+                            value={rescheduleDraft.date}
+                            onChange={(event) =>
+                              setRescheduleDraft((current) =>
+                                current
+                                  ? {
+                                      ...current,
+                                      date: event.target.value,
+                                      startTime: '',
+                                    }
+                                  : current,
+                              )
+                            }
+                          />
+                        </label>
 
                         <div className="slot-grid compact">
                           {activeRescheduleSlots?.map((slot) => (
@@ -703,7 +618,7 @@ export function AdminDashboard({
                             onClick={() => void handleRescheduleSubmit()}
                             disabled={isBusy}
                           >
-                            {isBusy ? 'Salvando...' : 'Salvar nova data'}
+                            Salvar remarcação
                           </button>
                           <button
                             type="button"
@@ -719,27 +634,24 @@ export function AdminDashboard({
                 )
               })
             ) : (
-              <div className="empty-state">
-                <ListFilter size={18} />
-                Nenhum agendamento encontrado para a data escolhida.
-              </div>
+              <div className="empty-state">Nenhum agendamento para esta data.</div>
             )}
           </div>
-        </div>
+        </section>
       ) : null}
 
       {activeTab === 'services' ? (
-        <div className="panel-card">
+        <section className="panel-card">
           <div className="panel-head">
             <div>
               <h2>Serviços</h2>
-              <p>Cadastre apenas os serviços tradicionais da Alyssa e ajuste duração ou valor quando quiser.</p>
+              <p>Somente serviços ativos aparecem para a cliente.</p>
             </div>
           </div>
 
           <div className="form-grid">
             <label className="input-shell">
-              <span>Nome do serviço</span>
+              <span>Nome</span>
               <input
                 type="text"
                 value={serviceForm.name}
@@ -786,12 +698,11 @@ export function AdminDashboard({
             </label>
 
             <label className="input-shell">
-              <span>Preço</span>
+              <span>Valor</span>
               <input
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="0 = Sob consulta"
                 value={serviceForm.price}
                 onChange={(event) =>
                   setServiceForm((current) => ({
@@ -803,7 +714,7 @@ export function AdminDashboard({
             </label>
 
             <label className="input-shell full">
-              <span>Descrição</span>
+              <span>Descrição opcional</span>
               <textarea
                 rows={3}
                 value={serviceForm.description}
@@ -815,6 +726,20 @@ export function AdminDashboard({
                 }
               />
             </label>
+
+            <label className="toggle-line">
+              <input
+                type="checkbox"
+                checked={serviceForm.active}
+                onChange={(event) =>
+                  setServiceForm((current) => ({
+                    ...current,
+                    active: event.target.checked,
+                  }))
+                }
+              />
+              <span>Ativo para cliente</span>
+            </label>
           </div>
 
           <div className="actions-row wrap">
@@ -824,203 +749,156 @@ export function AdminDashboard({
               onClick={() => void handleServiceSubmit()}
               disabled={isBusy}
             >
-              {isBusy
-                ? 'Salvando...'
-                : serviceForm.id
-                  ? 'Atualizar serviço'
-                  : 'Cadastrar serviço'}
+              {serviceForm.id ? 'Atualizar serviço' : 'Cadastrar serviço'}
             </button>
             <button type="button" className="ghost-button" onClick={resetServiceForm}>
-              Limpar formulário
-            </button>
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={async () => {
-                setIsBusy(true)
-                const result = await actions.resetDemoData()
-                setIsBusy(false)
-
-                if (!result.ok) {
-                  setError(result.error ?? 'Não foi possível reaplicar a base padrão.')
-                  return
-                }
-
-                setSuccess('Base padrão da Alissa reaplicada no Firebase.')
-              }}
-            >
-              Aplicar catálogo padrão
+              Limpar
             </button>
           </div>
 
           <div className="list-stack">
-            {state.services.map((service) => (
-              <article key={service.id} className="list-item">
-                <div>
-                  <strong>{service.name}</strong>
-                  <p>
-                    {formatDuration(service.durationMinutes)} •{' '}
-                    {formatServicePrice(service.price)} •{' '}
-                    {service.active ? 'visível para cliente' : 'oculto'}
-                  </p>
-                </div>
+            {state.services.length ? (
+              state.services.map((service) => (
+                <article key={service.id} className="list-item">
+                  <div>
+                    <strong>{service.name}</strong>
+                    <p>
+                      {formatDuration(service.durationMinutes)} -{' '}
+                      {formatServicePrice(service.price)} -{' '}
+                      {service.active ? 'Ativo' : 'Oculto'}
+                    </p>
+                  </div>
 
-                <div className="actions-row wrap">
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    onClick={() =>
-                      setServiceForm({
-                        id: service.id,
-                        name: service.name,
-                        category: service.category,
-                        description: service.description,
-                        durationMinutes: String(service.durationMinutes),
-                        price: String(service.price),
-                        featured: service.featured,
-                        accent: service.accent,
-                        active: service.active,
-                      })
-                    }
-                  >
-                    Editar
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    onClick={async () => {
-                      setIsBusy(true)
-                      const result = await actions.toggleServiceActive(service.id)
-                      setIsBusy(false)
-
-                      if (!result.ok) {
-                        setError(result.error ?? 'Não foi possível atualizar o serviço.')
-                        return
+                  <div className="actions-row wrap">
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() =>
+                        setServiceForm({
+                          id: service.id,
+                          name: service.name,
+                          category: service.category,
+                          description: service.description,
+                          durationMinutes: String(service.durationMinutes),
+                          price: String(service.price),
+                          featured: service.featured,
+                          accent: service.accent,
+                          active: service.active,
+                        })
                       }
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={async () => {
+                        setIsBusy(true)
+                        const result = await actions.toggleServiceActive(service.id)
+                        setIsBusy(false)
 
-                      setSuccess('Visibilidade do serviço atualizada.')
-                    }}
-                  >
-                    {service.active ? 'Ocultar' : 'Reativar'}
-                  </button>
-                </div>
-              </article>
-            ))}
+                        if (!result.ok) {
+                          setError(result.error ?? 'Não foi possível atualizar.')
+                          return
+                        }
+
+                        setSuccess('Serviço atualizado.')
+                      }}
+                    >
+                      {service.active ? 'Ocultar' : 'Ativar'}
+                    </button>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <div className="empty-state">Nenhum serviço cadastrado.</div>
+            )}
           </div>
-        </div>
+        </section>
       ) : null}
 
       {activeTab === 'hours' ? (
-        <div className="panel-card">
+        <section className="panel-card">
           <div className="panel-head">
             <div>
-              <h2>Funcionamento</h2>
-              <p>Defina dias úteis e janelas de atendimento por turno.</p>
+              <h2>Horários</h2>
+              <p>Defina o horário mínimo e máximo de cada dia.</p>
             </div>
           </div>
 
           <div className="list-stack">
-            {scheduleDraft.map((day, dayIndex) => (
-              <article key={day.weekday} className="schedule-card">
-                <div className="schedule-top">
-                  <div>
-                    <strong>{day.label}</strong>
-                    <p>{day.enabled ? 'Aberto para agendamento' : 'Fechado'}</p>
+            {editableSchedule.map((day, dayIndex) => {
+              const period = day.periods[0] ?? { start: '08:00', end: '18:00' }
+
+              return (
+                <article key={day.weekday} className="schedule-card">
+                  <div className="schedule-top">
+                    <div>
+                      <strong>{day.label}</strong>
+                      <p>{day.enabled ? `${period.start} até ${period.end}` : 'Fechado'}</p>
+                    </div>
+                    <label className="toggle-line">
+                      <input
+                        type="checkbox"
+                        checked={day.enabled}
+                        onChange={(event) =>
+                          updateScheduleDay(dayIndex, (current) => ({
+                            ...current,
+                            enabled: event.target.checked,
+                            periods: event.target.checked
+                              ? [current.periods[0] ?? { start: '08:00', end: '18:00' }]
+                              : [],
+                          }))
+                        }
+                      />
+                      <span>{day.enabled ? 'Aberto' : 'Fechado'}</span>
+                    </label>
                   </div>
-                  <label className="toggle-line">
-                    <input
-                      type="checkbox"
-                      checked={day.enabled}
-                      onChange={(event) =>
-                        setScheduleDraft((current) =>
-                          current.map((item, index) =>
-                            index === dayIndex
-                              ? {
-                                  ...item,
-                                  enabled: event.target.checked,
-                                }
-                              : item,
-                          ),
-                        )
-                      }
-                    />
-                    <span>{day.enabled ? 'Ativo' : 'Fechado'}</span>
-                  </label>
-                </div>
 
-                <div className="schedule-periods">
-                  {[0, 1].map((periodIndex) => {
-                    const period = day.periods[periodIndex] ?? { start: '', end: '' }
+                  {day.enabled ? (
+                    <div className="schedule-periods">
+                      <label className="input-shell">
+                        <span>Início</span>
+                        <input
+                          type="time"
+                          value={period.start}
+                          onChange={(event) =>
+                            updateScheduleDay(dayIndex, (current) => ({
+                              ...current,
+                              periods: [
+                                {
+                                  start: event.target.value,
+                                  end: current.periods[0]?.end ?? '18:00',
+                                },
+                              ],
+                            }))
+                          }
+                        />
+                      </label>
 
-                    return (
-                      <div key={periodIndex} className="schedule-period">
-                        <label className="input-shell">
-                          <span>Início</span>
-                          <input
-                            type="time"
-                            value={period.start}
-                            onChange={(event) =>
-                              setScheduleDraft((current) =>
-                                current.map((item, index) =>
-                                  index === dayIndex
-                                    ? {
-                                        ...item,
-                                        periods: [0, 1].map((targetIndex) =>
-                                          targetIndex === periodIndex
-                                            ? {
-                                                start: event.target.value,
-                                                end:
-                                                  item.periods[targetIndex]?.end ?? '',
-                                              }
-                                            : item.periods[targetIndex] ?? {
-                                                start: '',
-                                                end: '',
-                                              },
-                                        ),
-                                      }
-                                    : item,
-                                ),
-                              )
-                            }
-                          />
-                        </label>
-
-                        <label className="input-shell">
-                          <span>Fim</span>
-                          <input
-                            type="time"
-                            value={period.end}
-                            onChange={(event) =>
-                              setScheduleDraft((current) =>
-                                current.map((item, index) =>
-                                  index === dayIndex
-                                    ? {
-                                        ...item,
-                                        periods: [0, 1].map((targetIndex) =>
-                                          targetIndex === periodIndex
-                                            ? {
-                                                start:
-                                                  item.periods[targetIndex]?.start ?? '',
-                                                end: event.target.value,
-                                              }
-                                            : item.periods[targetIndex] ?? {
-                                                start: '',
-                                                end: '',
-                                              },
-                                        ),
-                                      }
-                                    : item,
-                                ),
-                              )
-                            }
-                          />
-                        </label>
-                      </div>
-                    )
-                  })}
-                </div>
-              </article>
-            ))}
+                      <label className="input-shell">
+                        <span>Fim</span>
+                        <input
+                          type="time"
+                          value={period.end}
+                          onChange={(event) =>
+                            updateScheduleDay(dayIndex, (current) => ({
+                              ...current,
+                              periods: [
+                                {
+                                  start: current.periods[0]?.start ?? '08:00',
+                                  end: event.target.value,
+                                },
+                              ],
+                            }))
+                          }
+                        />
+                      </label>
+                    </div>
+                  ) : null}
+                </article>
+              )
+            })}
           </div>
 
           <div className="actions-row">
@@ -1030,18 +908,18 @@ export function AdminDashboard({
               onClick={() => void handleScheduleSave()}
               disabled={isBusy}
             >
-              {isBusy ? 'Salvando...' : 'Salvar funcionamento'}
+              Salvar horários
             </button>
           </div>
-        </div>
+        </section>
       ) : null}
 
       {activeTab === 'blocks' ? (
-        <div className="panel-card">
+        <section className="panel-card">
           <div className="panel-head">
             <div>
-              <h2>Bloqueios de horário</h2>
-              <p>Use para cursos, folgas, pausas longas ou datas indisponíveis.</p>
+              <h2>Bloqueios</h2>
+              <p>Datas ou intervalos que não devem aparecer para cliente.</p>
             </div>
           </div>
 
@@ -1126,154 +1004,46 @@ export function AdminDashboard({
               onClick={() => void handleBlockSubmit()}
               disabled={isBusy}
             >
-              {isBusy ? 'Salvando...' : 'Adicionar bloqueio'}
+              Adicionar bloqueio
             </button>
           </div>
 
           <div className="list-stack">
-            {state.blockedPeriods.map((block) => (
-              <article key={block.id} className="list-item">
-                <div>
-                  <strong>{block.reason}</strong>
-                  <p>
-                    {formatLongDate(block.date)} •{' '}
-                    {block.allDay ? 'dia inteiro' : `${block.start} até ${block.end}`}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="ghost-button danger"
-                  onClick={async () => {
-                    setIsBusy(true)
-                    const result = await actions.removeBlockedPeriod(block.id)
-                    setIsBusy(false)
-
-                    if (!result.ok) {
-                      setError(result.error ?? 'Não foi possível remover o bloqueio.')
-                      return
-                    }
-
-                    setSuccess('Bloqueio removido.')
-                  }}
-                >
-                  Remover
-                </button>
-              </article>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {activeTab === 'clients' ? (
-        <div className="panel-card">
-          <div className="panel-head">
-            <div>
-              <h2>Clientes</h2>
-              <p>Base montada a partir dos agendamentos já registrados.</p>
-            </div>
-          </div>
-
-          <div className="list-stack">
-            {clients.map((client) => (
-              <article key={client.phone} className="list-item">
-                <div>
-                  <strong>{client.name}</strong>
-                  <p>
-                    {formatPhoneDisplay(client.phone)} • {client.appointments} agendamento(s)
-                  </p>
-                </div>
-                <span className="mini-note">
-                  Último registro: {formatTimestamp(client.lastVisit)}
-                </span>
-              </article>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {activeTab === 'notifications' ? (
-        <div className="panel-card">
-          <div className="panel-head">
-            <div>
-              <h2>Central de notificações</h2>
-              <p>
-                Preparada para WhatsApp, e-mail ou disparo interno. Aqui você já
-                consegue revisar e marcar o que foi enviado.
-              </p>
-            </div>
-          </div>
-
-          <div className="list-stack">
-            {state.notifications
-              .slice()
-              .sort(
-                (left, right) =>
-                  new Date(right.scheduledFor).getTime() -
-                  new Date(left.scheduledFor).getTime(),
-              )
-              .map((notification) => (
-                <article key={notification.id} className="notification-card">
-                  <div className="appointment-top">
-                    <div>
-                      <strong>{notification.title}</strong>
-                      <p>
-                        {notification.channel} • {formatTimestamp(notification.scheduledFor)}
-                      </p>
-                    </div>
-                    <span className={`status-pill ${notification.status}`}>
-                      {notification.status}
-                    </span>
+            {state.blockedPeriods.length ? (
+              state.blockedPeriods.map((block) => (
+                <article key={block.id} className="list-item">
+                  <div>
+                    <strong>{block.reason}</strong>
+                    <p>
+                      {formatLongDate(block.date)} -{' '}
+                      {block.allDay ? 'Dia inteiro' : `${block.start} até ${block.end}`}
+                    </p>
                   </div>
-                  <p className="notification-message">{notification.message}</p>
-                  <div className="actions-row wrap">
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      onClick={() => void copyMessage(notification.message)}
-                    >
-                      <Copy size={16} />
-                      Copiar
-                    </button>
-                    {notification.channel === 'whatsapp' && notification.recipient ? (
-                      <a
-                        className="ghost-button"
-                        href={createWhatsAppLink(
-                          notification.recipient,
-                          notification.message,
-                        )}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Abrir WhatsApp
-                      </a>
-                    ) : null}
-                    {notification.status !== 'sent' ? (
-                      <button
-                        type="button"
-                        className="primary-button"
-                        onClick={async () => {
-                          setIsBusy(true)
-                          const result = await actions.markNotificationSent(
-                            notification.id,
-                          )
-                          setIsBusy(false)
+                  <button
+                    type="button"
+                    className="ghost-button danger"
+                    onClick={async () => {
+                      setIsBusy(true)
+                      const result = await actions.removeBlockedPeriod(block.id)
+                      setIsBusy(false)
 
-                          if (!result.ok) {
-                            setError(result.error ?? 'Não foi possível atualizar.')
-                            return
-                          }
+                      if (!result.ok) {
+                        setError(result.error ?? 'Não foi possível remover.')
+                        return
+                      }
 
-                          setSuccess('Notificação marcada como enviada.')
-                        }}
-                      >
-                        Marcar como enviada
-                      </button>
-                    ) : null}
-                  </div>
+                      setSuccess('Bloqueio removido.')
+                    }}
+                  >
+                    Remover
+                  </button>
                 </article>
-              ))}
+              ))
+            ) : (
+              <div className="empty-state">Nenhum bloqueio cadastrado.</div>
+            )}
           </div>
-        </div>
+        </section>
       ) : null}
     </div>
   )

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LockKeyhole, LogOut, ShieldCheck } from 'lucide-react'
+import { LockKeyhole, LogOut } from 'lucide-react'
 import type { User } from 'firebase/auth'
 import type { SalonActions } from '../../hooks/useSalonStore'
 import type { ActionResult, AdminCredentials, SalonState, SlotOption } from '../../types/domain'
@@ -48,10 +48,7 @@ export function AdminAccess({
     setIsSubmitting(false)
 
     if (!result.ok) {
-      setFeedback(
-        result.error ??
-          'Não foi possível autenticar a Alissa agora. Confira e-mail, senha e o provedor de login no Firebase.',
-      )
+      setFeedback(result.error ?? 'Não foi possível entrar.')
       return
     }
 
@@ -66,8 +63,7 @@ export function AdminAccess({
       <section className="panel-card">
         <div className="page-intro">
           <span className="eyebrow">Painel da Alyssa</span>
-          <h1>Conectando com o Firebase</h1>
-          <p>Carregando autenticação e os dados da agenda em tempo real.</p>
+          <h1>Carregando agenda</h1>
         </div>
       </section>
     )
@@ -77,17 +73,15 @@ export function AdminAccess({
     return (
       <section className="panel-card">
         <div className="page-intro">
-          <span className="eyebrow">Painel protegido</span>
-          <h1>Entre com a senha da Alissa</h1>
-        
+          <span className="eyebrow">Painel da Alyssa</span>
+          <h1>Acesso admin</h1>
         </div>
 
-        <div className="summary-card">
+        <div className="form-panel">
           <label className="input-shell">
-            <span>E-mail do admin</span>
+            <span>E-mail</span>
             <input
               type="email"
-              placeholder="alyssa@email.com"
               value={credentials.email}
               onChange={(event) =>
                 setCredentials((current) => ({
@@ -102,7 +96,6 @@ export function AdminAccess({
             <span>Senha</span>
             <input
               type="password"
-              placeholder="Digite sua senha"
               value={credentials.password}
               onChange={(event) =>
                 setCredentials((current) => ({
@@ -125,19 +118,15 @@ export function AdminAccess({
             </div>
           ) : null}
 
-          <div className="actions-row wrap">
+          <div className="actions-row">
             <button
               type="button"
               className="primary-button"
               onClick={() => void handleLogin()}
               disabled={isSubmitting}
             >
-              {isSubmitting ? 'Entrando...' : 'Entrar no painel'}
+              {isSubmitting ? 'Entrando...' : 'Entrar'}
             </button>
-          </div>
-
-          <div className="bullet-list">
-           
           </div>
         </div>
       </section>
@@ -146,28 +135,22 @@ export function AdminAccess({
 
   return (
     <div className="admin-layout">
-      <section className="panel-card">
+      <section className="panel-card slim-panel">
         <div className="appointment-top">
           <div>
             <span className="eyebrow">Acesso liberado</span>
-            <h2>Bem-vinda, Alissa</h2>
+            <h2>Alyssa</h2>
             <p>{adminUser.email}</p>
           </div>
 
-          <div className="actions-row wrap">
-            <div className="panel-chip">
-              <ShieldCheck size={16} />
-              Firebase Auth ativo
-            </div>
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={() => void logoutAdmin()}
-            >
-              <LogOut size={16} />
-              Sair
-            </button>
-          </div>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => void logoutAdmin()}
+          >
+            <LogOut size={16} />
+            Sair
+          </button>
         </div>
       </section>
 
