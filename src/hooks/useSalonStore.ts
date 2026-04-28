@@ -476,7 +476,7 @@ export function useSalonStore() {
     if (!firebaseAuth.currentUser) {
       return {
         ok: false,
-        error: 'Entre com a conta da Alyssa para acessar essa ação.',
+        error: 'Entre com a conta da Alissa para acessar essa ação.',
       } satisfies ActionResult
     }
 

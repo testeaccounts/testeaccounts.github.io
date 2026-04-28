@@ -276,7 +276,7 @@ export function BookingFlow({
             ) : (
               <p className="helper-line">
                 Não há vagas na janela atual. Ajuste o funcionamento pelo painel
-                da Alyssa para liberar novas datas.
+                da Alissa para liberar novas datas.
               </p>
             )}
           </>

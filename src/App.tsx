@@ -69,7 +69,7 @@ function App() {
               to="/admin"
               className={({ isActive }) => (isActive ? 'nav-pill active' : 'nav-pill')}
             >
-              Alyssa
+              Alissa
             </NavLink>
           </nav>
         </header>
@@ -77,11 +77,6 @@ function App() {
         <section className="hero-panel">
           <div className="hero-copy">
             <span className="eyebrow">Atendimento somente com hora marcada</span>
-            <h1>Agende pé, mão ou pé e mão em poucos toques no celular.</h1>
-            <p>
-              {state.settings.tagline} Veja horários realmente livres, escolha a
-              melhor data e confirme o atendimento sem depender de conversa manual.
-            </p>
           </div>
 
           <div className="hero-stack">

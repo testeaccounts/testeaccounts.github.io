@@ -389,21 +389,6 @@ export function AdminDashboard({
             </div>
           </article>
 
-          <article className="panel-card wide">
-            <div className="panel-head">
-              <div>
-                <h2>Regras ativas no banco</h2>
-                <p>Como o sistema está operando agora com Firebase e hora marcada.</p>
-              </div>
-            </div>
-            <ul className="bullet-list">
-              <li>Serviços, horários, bloqueios e agenda são lidos do Firestore.</li>
-              <li>O painel da Alyssa abre só após autenticação com senha.</li>
-              <li>Agendamentos criam bloqueios de slots no banco para evitar conflito.</li>
-              <li>Confirmações e lembretes ficam registrados na coleção de notificações.</li>
-              <li>O catálogo padrão desta versão é focado em pé, mão e pé e mão tradicional.</li>
-            </ul>
-          </article>
         </div>
       ) : null}
 
@@ -412,8 +397,7 @@ export function AdminDashboard({
             <div className="panel-head">
               <div>
                 <h2>Agenda do dia</h2>
-                <p>Confirme, cancele, remarque ou cadastre um horário manual da cliente.</p>
-              </div>
+                </div>
             </div>
 
           <div className="summary-card">
@@ -862,7 +846,7 @@ export function AdminDashboard({
                   return
                 }
 
-                setSuccess('Base padrão da Alyssa reaplicada no Firebase.')
+                setSuccess('Base padrão da Alissa reaplicada no Firebase.')
               }}
             >
               Aplicar catálogo padrão

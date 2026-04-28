@@ -50,7 +50,7 @@ export function AdminAccess({
     if (!result.ok) {
       setFeedback(
         result.error ??
-          'Não foi possível autenticar a Alyssa agora. Confira e-mail, senha e o provedor de login no Firebase.',
+          'Não foi possível autenticar a Alissa agora. Confira e-mail, senha e o provedor de login no Firebase.',
       )
       return
     }
@@ -78,11 +78,8 @@ export function AdminAccess({
       <section className="panel-card">
         <div className="page-intro">
           <span className="eyebrow">Painel protegido</span>
-          <h1>Entre com a senha da Alyssa</h1>
-          <p>
-            O painel administrativo agora usa Firebase Auth. Entre com e-mail e
-            senha para liberar agenda, clientes, bloqueios e notificações.
-          </p>
+          <h1>Entre com a senha da Alissa</h1>
+        
         </div>
 
         <div className="summary-card">
@@ -140,10 +137,7 @@ export function AdminAccess({
           </div>
 
           <div className="bullet-list">
-            <span className="mini-note">
-              Dica: ative o provedor Email/Password no Firebase Authentication e
-              crie a usuária da Alyssa no console.
-            </span>
+           
           </div>
         </div>
       </section>
@@ -156,7 +150,7 @@ export function AdminAccess({
         <div className="appointment-top">
           <div>
             <span className="eyebrow">Acesso liberado</span>
-            <h2>Bem-vinda, Alyssa</h2>
+            <h2>Bem-vinda, Alissa</h2>
             <p>{adminUser.email}</p>
           </div>
 
