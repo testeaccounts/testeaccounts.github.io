@@ -99,17 +99,7 @@ function App() {
 
             <div className="stat-grid">
               <article className="stat-card">
-                <span>Serviços ativos</span>
-                <strong>{activeServices.length}</strong>
-              </article>
-              <article className="stat-card">
-                <span>Janela aberta</span>
-                <strong>{state.settings.bookingWindowDays} dias</strong>
-              </article>
-              <article className="stat-card">
-                <span>Ocupação hoje</span>
-                <strong>{occupancyToday}%</strong>
-              </article>
+                
             </div>
           </div>
         </section>
