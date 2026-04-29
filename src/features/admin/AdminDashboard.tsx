@@ -114,10 +114,6 @@ export function AdminDashboard({
       return false
     }
 
-    if (appointment.status === 'cancelled') {
-      return false
-    }
-
     if (!deferredQuery.trim()) {
       return true
     }
@@ -133,6 +129,10 @@ export function AdminDashboard({
       .toLowerCase()
 
     return haystack.includes(deferredQuery.toLowerCase())
+  })
+
+  const cancelledAppointments = sortAppointments(optimisticAppointments).filter((appointment) => {
+    return appointment.date === agendaDate && appointment.status === 'cancelled'
   })
 
   const manualSlots =
@@ -582,29 +582,6 @@ export function AdminDashboard({
                       >
                         Cancelar
                       </button>
-                      {(appointment.status === 'cancelled' || (appointment.status === 'confirmed' && appointment.date < todayIso())) && (
-                        <button
-                          type="button"
-                          className="ghost-button danger"
-                          onClick={async () => {
-                            if (!confirm('Tem certeza que deseja apagar esta consulta do sistema?')) {
-                              return
-                            }
-                            setIsBusy(true)
-                            const result = await actions.deleteAppointment(appointment.id)
-                            setIsBusy(false)
-
-                            if (!result.ok) {
-                              setError(result.error ?? 'Não foi possível excluir.')
-                              return
-                            }
-
-                            setSuccess('Consulta excluída do sistema.')
-                          }}
-                        >
-                          Excluir
-                        </button>
-                      )}
                     </div>
 
                     {isEditing ? (
@@ -681,6 +658,67 @@ export function AdminDashboard({
               <div className="empty-state">Nenhum agendamento para esta data.</div>
             )}
           </div>
+
+          {cancelledAppointments.length > 0 && (
+            <div className="cancelled-section">
+              <h3>Horários Cancelados</h3>
+              <div className="list-stack">
+                {cancelledAppointments.map((appointment) => {
+                  const service = getServiceById(state, appointment.serviceId)
+
+                  return (
+                    <article key={appointment.id} className="appointment-card cancelled">
+                      <div className="appointment-top">
+                        <div>
+                          <strong>{appointment.client.name}</strong>
+                          <p>
+                            {appointment.startTime} - {appointment.endTime} -{' '}
+                            {service?.name ?? 'Serviço'}
+                          </p>
+                        </div>
+                        <span className={`status-pill ${appointment.status}`}>
+                          {statusLabel(appointment.status)}
+                        </span>
+                      </div>
+
+                      <div className="detail-grid">
+                        <span>WhatsApp: {formatPhoneDisplay(appointment.client.phone)}</span>
+                        <span>Duração: {formatDuration(service?.durationMinutes ?? 0)}</span>
+                        {appointment.client.email ? (
+                          <span>E-mail: {appointment.client.email}</span>
+                        ) : null}
+                        {appointment.notes ? <span>Detalhes: {appointment.notes}</span> : null}
+                      </div>
+
+                      <div className="actions-row">
+                        <button
+                          type="button"
+                          className="ghost-button danger"
+                          onClick={async () => {
+                            if (!confirm('Tem certeza que deseja apagar esta consulta do sistema?')) {
+                              return
+                            }
+                            setIsBusy(true)
+                            const result = await actions.deleteAppointment(appointment.id)
+                            setIsBusy(false)
+
+                            if (!result.ok) {
+                              setError(result.error ?? 'Não foi possível excluir.')
+                              return
+                            }
+
+                            setSuccess('Consulta excluída do sistema.')
+                          }}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </section>
       ) : null}
 
