@@ -37,7 +37,7 @@ export function PortfolioCarousel() {
         <img
           className="portfolio-photo"
           src={activeSlide.imageUrl}
-          alt="Foto do portfólio da Alyssa"
+          alt="Foto do portfólio da Alissa"
           loading="lazy"
         />
       </div>

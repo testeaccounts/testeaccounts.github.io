@@ -205,6 +205,7 @@ export interface SalonActions {
     date: string,
     startTime: string,
   ) => Promise<ActionResult<AppointmentItem>>
+  deleteAppointment: (appointmentId: string) => Promise<ActionResult>
   upsertService: (
     values: Omit<ServiceItem, 'id'> & { id?: string },
   ) => Promise<ActionResult<ServiceItem>>
@@ -487,7 +488,7 @@ export function useSalonStore() {
     if (!firebaseAuth.currentUser) {
       return {
         ok: false,
-        error: 'Entre com a conta da Alyssa para acessar essa ação.',
+        error: 'Entre com a conta da Alissa para acessar essa ação.',
       } satisfies ActionResult
     }
 
@@ -804,6 +805,66 @@ export function useSalonStore() {
               ? error.message
               : 'Não foi possível remarcar agora.',
         } satisfies ActionResult<AppointmentItem>
+      }
+    },
+    async deleteAppointment(appointmentId) {
+      const adminCheck = await requireAdmin()
+
+      if (!adminCheck.ok) {
+        return adminCheck
+      }
+
+      const currentState = stateRef.current
+      const appointment = currentState.appointments.find(
+        (appointment) => appointment.id === appointmentId,
+      )
+
+      if (!appointment) {
+        return {
+          ok: false,
+          error: 'Agendamento não encontrado.',
+        } satisfies ActionResult
+      }
+
+      // Only allow deletion of cancelled appointments or past confirmed appointments
+      if (appointment.status !== 'cancelled' && !(appointment.status === 'confirmed' && new Date(appointment.date + 'T' + appointment.endTime) < new Date())) {
+        return {
+          ok: false,
+          error: 'Só é possível excluir agendamentos cancelados ou já realizados.',
+        } satisfies ActionResult
+      }
+
+      try {
+        await runTransaction(firestoreDb, async (transaction) => {
+          transaction.delete(doc(appointmentsCollectionRef, appointmentId))
+
+          // Remove associated slot locks
+          const slotLocks = currentState.slotLocks.filter(
+            (slotLock) => slotLock.appointmentId === appointmentId,
+          )
+          for (const slotLock of slotLocks) {
+            transaction.delete(doc(slotLocksCollectionRef, slotLock.id))
+          }
+
+          // Cancel associated notifications
+          const notificationsToCancel = cancelReminderNotifications(currentState.notifications, appointmentId)
+          for (const notification of notificationsToCancel) {
+            transaction.set(
+              doc(notificationsCollectionRef, notification.id),
+              notification,
+            )
+          }
+        })
+
+        return { ok: true } satisfies ActionResult
+      } catch (error) {
+        return {
+          ok: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : 'Não foi possível excluir o agendamento.',
+        } satisfies ActionResult
       }
     },
     async upsertService(values) {

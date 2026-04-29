@@ -1,4 +1,4 @@
-import { useDeferredValue, useState } from 'react'
+import { useDeferredValue, useEffect, useState } from 'react'
 import {
   CalendarClock,
   CalendarRange,
@@ -99,12 +99,22 @@ export function AdminDashboard({
     message: '',
   })
   const [isBusy, setIsBusy] = useState(false)
+  const [optimisticAppointments, setOptimisticAppointments] = useState(state.appointments)
+
+  // Sync optimistic with state
+  useEffect(() => {
+    setOptimisticAppointments(state.appointments)
+  }, [state.appointments])
 
   const datesWindow = buildUpcomingDates(state.settings.bookingWindowDays)
   const activeServices = state.services.filter((service) => service.active)
   const editableSchedule = scheduleDraft.length ? scheduleDraft : state.weeklySchedule
-  const filteredAppointments = sortAppointments(state.appointments).filter((appointment) => {
+  const filteredAppointments = sortAppointments(optimisticAppointments).filter((appointment) => {
     if (appointment.date !== agendaDate) {
+      return false
+    }
+
+    if (appointment.status === 'cancelled') {
       return false
     }
 
@@ -280,7 +290,7 @@ export function AdminDashboard({
   return (
     <div className="admin-layout">
       <section className="page-intro">
-        <span className="eyebrow">Painel da Alyssa</span>
+        <span className="eyebrow">Painel da Alissa</span>
         <h1>Agenda e horários</h1>
       </section>
 
@@ -544,6 +554,15 @@ export function AdminDashboard({
                         type="button"
                         className="ghost-button danger"
                         onClick={async () => {
+                          // Optimistic update: remove from UI immediately
+                          setOptimisticAppointments((current) =>
+                            current.map((appt) =>
+                              appt.id === appointment.id
+                                ? { ...appt, status: 'cancelled' as const }
+                                : appt
+                            )
+                          )
+
                           setIsBusy(true)
                           const result = await actions.updateAppointmentStatus(
                             appointment.id,
@@ -552,6 +571,8 @@ export function AdminDashboard({
                           setIsBusy(false)
 
                           if (!result.ok) {
+                            // Revert optimistic update on failure
+                            setOptimisticAppointments(state.appointments)
                             setError(result.error ?? 'Não foi possível cancelar.')
                             return
                           }
@@ -561,6 +582,29 @@ export function AdminDashboard({
                       >
                         Cancelar
                       </button>
+                      {(appointment.status === 'cancelled' || (appointment.status === 'confirmed' && appointment.date < todayIso())) && (
+                        <button
+                          type="button"
+                          className="ghost-button danger"
+                          onClick={async () => {
+                            if (!confirm('Tem certeza que deseja apagar esta consulta do sistema?')) {
+                              return
+                            }
+                            setIsBusy(true)
+                            const result = await actions.deleteAppointment(appointment.id)
+                            setIsBusy(false)
+
+                            if (!result.ok) {
+                              setError(result.error ?? 'Não foi possível excluir.')
+                              return
+                            }
+
+                            setSuccess('Consulta excluída do sistema.')
+                          }}
+                        >
+                          Excluir
+                        </button>
+                      )}
                     </div>
 
                     {isEditing ? (

@@ -44,8 +44,48 @@ export function BookingFlow({
     message: '',
   })
   const [hasConfirmation, setHasConfirmation] = useState(false)
+  const [confirmationModal, setConfirmationModal] = useState<{
+    show: boolean
+    date: string
+    time: string
+  }>({ show: false, date: '', time: '' })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSelectingDate, startDateTransition] = useTransition()
+
+  const setupWebNotificationReminder = async (date: string, time: string) => {
+    if (!('Notification' in window)) {
+      console.log('Este navegador não suporta notificações.')
+      return
+    }
+
+    if (Notification.permission === 'granted') {
+      scheduleNotification(date, time)
+    } else if (Notification.permission !== 'denied') {
+      try {
+        const permission = await Notification.requestPermission()
+        if (permission === 'granted') {
+          scheduleNotification(date, time)
+        }
+      } catch (error) {
+        console.log('Erro ao pedir permissão de notificação:', error)
+      }
+    }
+  }
+
+  const scheduleNotification = (date: string, time: string) => {
+    const appointmentDateTime = new Date(`${date}T${time}`)
+    const reminderTime = new Date(appointmentDateTime.getTime() - 180 * 60 * 1000) // 180 minutes before
+
+    if (reminderTime > new Date()) {
+      const delay = reminderTime.getTime() - Date.now()
+      setTimeout(() => {
+        new Notification('Lembrete de agendamento', {
+          body: `Seu horário é às ${time} hoje.`,
+          icon: '/favicon.ico', // assuming there's a favicon
+        })
+      }, delay)
+    }
+  }
 
   const activeServices = state.services.filter((service) => service.active)
   const upcomingDates = buildUpcomingDates(state.settings.bookingWindowDays)
@@ -139,12 +179,16 @@ export function BookingFlow({
     }
 
     setHasConfirmation(true)
+    setConfirmationModal({ show: true, date: effectiveDate, time: effectiveTime })
     setFeedback({
       type: 'success',
       message: 'Agendamento confirmado. A confirmação apareceu no fluxo do sistema.',
     })
     setFormValues(initialForm)
     setFieldErrors({})
+
+    // Setup web notification reminder
+    setupWebNotificationReminder(effectiveDate, effectiveTime)
   }
 
   if (!state.weeklySchedule.length && !activeServices.length) {
@@ -201,7 +245,7 @@ export function BookingFlow({
           </div>
         ) : (
           <div className="empty-state compact">
-            Alyssa ainda não liberou serviços para agendamento.
+            Alissa ainda não liberou serviços para agendamento.
           </div>
         )}
       </section>
@@ -254,7 +298,7 @@ export function BookingFlow({
           <span className="step-index">3</span>
           <div>
             <h2>Horário</h2>
-            <p>Os horários respeitam a janela definida pela Alyssa.</p>
+            <p>Os horários respeitam a janela definida pela Alissa.</p>
           </div>
         </div>
 
@@ -426,6 +470,27 @@ export function BookingFlow({
           </button>
         ) : null}
       </section>
+
+      {confirmationModal.show && (
+        <div className="modal-overlay" onClick={() => setConfirmationModal({ show: false, date: '', time: '' })}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>Agendamento Confirmado!</h3>
+            <p>Seu agendamento foi feito para o dia {formatLongDate(confirmationModal.date)} às {confirmationModal.time}.</p>
+            {'Notification' in window && Notification.permission === 'default' && (
+              <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                Podemos te lembrar antes do seu horário?
+              </p>
+            )}
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => setConfirmationModal({ show: false, date: '', time: '' })}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,9 +1,9 @@
-# Alyssa Unhas
+# Alissa Unhas
 
 Sistema de autoatendimento para manicure/unhas com duas experiências no mesmo projeto:
 
 - fluxo da cliente para escolher serviço, data, horário e confirmar agendamento
-- painel administrativo para Alyssa gerenciar serviços, agenda, bloqueios, clientes e notificações
+- painel administrativo para Alissa gerenciar serviços, agenda, bloqueios, clientes e notificações
 - interface mobile-first focada em esmaltação tradicional e unhas naturais
 
 ## Stack
@@ -32,7 +32,7 @@ Sistema de autoatendimento para manicure/unhas com duas experiências no mesmo p
 ## Estrutura
 
 - `src/features/booking`: experiência principal da cliente
-- `src/features/admin`: painel da Alyssa
+- `src/features/admin`: painel da Alissa
 - `src/hooks/useSalonStore.ts`: estado, persistência e ações de negócio
 - `src/lib/scheduling.ts`: regras de agenda, conflito e disponibilidade
 - `src/lib/notifications.ts`: geração e atualização das notificações
@@ -60,16 +60,16 @@ O projeto já inclui o workflow `.github/workflows/deploy.yml`. Ao subir a branc
 
 O projeto agora usa:
 
-- `Firebase Auth` para proteger o painel da Alyssa com e-mail e senha
+- `Firebase Auth` para proteger o painel da Alissa com e-mail e senha
 - `Cloud Firestore` para serviços, agenda, bloqueios, horários ocupados, clientes e notificações
 
 ### Configuração necessária
 
 1. No Firebase Console, ative `Authentication > Sign-in method > Email/Password`.
-2. Crie a usuária da Alyssa em `Authentication > Users`.
+2. Crie a usuária da Alissa em `Authentication > Users`.
 3. Crie o banco em `Firestore Database`.
 4. Publique as regras de [firestore.rules](/C:/xampp/77/Projetos/AlyssaUnhas/firestore.rules).
-5. Faça o primeiro login da Alyssa no painel para permitir que a base inicial seja sincronizada no Firestore.
+5. Faça o primeiro login da Alissa no painel para permitir que a base inicial seja sincronizada no Firestore.
 
 ### Estrutura principal no Firestore
 

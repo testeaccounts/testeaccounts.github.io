@@ -97,8 +97,8 @@ export function createSeedState(): SalonState {
     notifications: [],
     settings: {
       dataVersion: DEFAULT_DATA_VERSION,
-      salonName: 'Alyssa Unhas',
-      ownerName: 'Alyssa',
+      salonName: 'Alissa Unhas',
+      ownerName: 'Alissa',
       tagline: '',
       timezone: 'America/Sao_Paulo',
       bookingWindowDays: 14,

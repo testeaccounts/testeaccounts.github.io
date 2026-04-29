@@ -62,7 +62,7 @@ export function AdminAccess({
     return (
       <section className="panel-card">
         <div className="page-intro">
-          <span className="eyebrow">Painel da Alyssa</span>
+          <span className="eyebrow">Painel da Alissa</span>
           <h1>Carregando agenda</h1>
         </div>
       </section>
@@ -73,7 +73,7 @@ export function AdminAccess({
     return (
       <section className="panel-card">
         <div className="page-intro">
-          <span className="eyebrow">Painel da Alyssa</span>
+          <span className="eyebrow">Painel da Alissa</span>
           <h1>Acesso admin</h1>
         </div>
 
@@ -139,7 +139,7 @@ export function AdminAccess({
         <div className="appointment-top">
           <div>
             <span className="eyebrow">Acesso liberado</span>
-            <h2>Alyssa</h2>
+            <h2>Alissa</h2>
             <p>{adminUser.email}</p>
           </div>
 
